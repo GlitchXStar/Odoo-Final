@@ -6,6 +6,13 @@ import {
 } from 'lucide-react';
 import { employees, users, roles as rolesApi } from '../services/api.js';
 
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
+const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+const YEARS = Array.from({ length: 50 }, (_, i) => new Date().getFullYear() - i);
+
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 const designations = [
   'Junior Developer', 'Senior Developer', 'Tech Lead', 'Engineering Manager',
@@ -141,8 +148,11 @@ export default function EmployeeForm() {
     }
   };
 
-  const update = (field) => (e) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const update = (field) => (e) => {
+    let val = e.target.value;
+    if (field === 'panNumber' || field === 'ifsc') val = val.toUpperCase();
+    setForm((prev) => ({ ...prev, [field]: val }));
+  };
 
   const toUserPayload = (f) => ({
     firstName: f.firstName || undefined,
@@ -352,18 +362,105 @@ export default function EmployeeForm() {
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
               </div>
             </FormField>
-            <FormField
-              label="Join Date" id="joinDate" type="date"
-              value={form.joinDate} onChange={update('joinDate')} required
-            />
+            <FormField label="Join Date" id="joinDate" required>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <select
+                    value={form.joinDate ? parseInt(form.joinDate.split('-')[2]) : ''}
+                    onChange={(e) => {
+                      const [y, m] = (form.joinDate || `${new Date().getFullYear()}-01-01`).split('-');
+                      setForm(prev => ({...prev, joinDate: `${y}-${m}-${String(e.target.value).padStart(2,'0')}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="" disabled>Day</option>
+                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+                <div className="relative flex-[2]">
+                  <select
+                    value={form.joinDate ? parseInt(form.joinDate.split('-')[1]) : ''}
+                    onChange={(e) => {
+                      const [y, , d] = (form.joinDate || `${new Date().getFullYear()}-01-01`).split('-');
+                      setForm(prev => ({...prev, joinDate: `${y}-${String(e.target.value).padStart(2,'0')}-${d}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="" disabled>Month</option>
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+                <div className="relative flex-1">
+                  <select
+                    value={form.joinDate ? parseInt(form.joinDate.split('-')[0]) : ''}
+                    onChange={(e) => {
+                      const [, m, d] = (form.joinDate || `${new Date().getFullYear()}-01-01`).split('-');
+                      setForm(prev => ({...prev, joinDate: `${e.target.value}-${m}-${d}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="" disabled>Year</option>
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+              </div>
+            </FormField>
           </FormSection>
 
           {/* Personal Details */}
           <FormSection title="Personal Details" icon={Calendar}>
-            <FormField
-              label="Date of Birth" id="dob" type="date"
-              value={form.dob} onChange={update('dob')}
-            />
+            <FormField label="Date of Birth" id="dob">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <select
+                    value={form.dob ? parseInt(form.dob.split('-')[2]) : ''}
+                    onChange={(e) => {
+                      const [y, m] = (form.dob || `${new Date().getFullYear()}-01-01`).split('-');
+                      setForm(prev => ({...prev, dob: `${y}-${m}-${String(e.target.value).padStart(2,'0')}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Day</option>
+                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+                <div className="relative flex-[2]">
+                  <select
+                    value={form.dob ? parseInt(form.dob.split('-')[1]) : ''}
+                    onChange={(e) => {
+                      const [y, , d] = (form.dob || `${new Date().getFullYear()}-01-01`).split('-');
+                      setForm(prev => ({...prev, dob: `${y}-${String(e.target.value).padStart(2,'0')}-${d}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Month</option>
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+                <div className="relative flex-1">
+                  <select
+                    value={form.dob ? parseInt(form.dob.split('-')[0]) : ''}
+                    onChange={(e) => {
+                      const [, m, d] = (form.dob || `${new Date().getFullYear()}-01-01`).split('-');
+                      setForm(prev => ({...prev, dob: `${e.target.value}-${m}-${d}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Year</option>
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+              </div>
+            </FormField>
             <FormField label="Gender" id="gender">
               <div className="relative">
                 <select
@@ -451,14 +548,28 @@ export default function EmployeeForm() {
               label="Account Number" id="accountNumber" placeholder="Account number"
               value={form.accountNumber} onChange={update('accountNumber')}
             />
-            <FormField
-              label="IFSC Code" id="ifsc" placeholder="e.g. HDFC0001234"
-              value={form.ifsc} onChange={update('ifsc')}
-            />
-            <FormField
-              label="PAN Number" id="panNumber" placeholder="e.g. ABCPS1234K"
-              value={form.panNumber} onChange={update('panNumber')}
-            />
+            <FormField label="IFSC Code" id="ifsc">
+              <input
+                id="ifsc"
+                type="text"
+                value={form.ifsc}
+                onChange={update('ifsc')}
+                placeholder="e.g. HDFC0001234"
+                className="input-field uppercase"
+                maxLength={11}
+              />
+            </FormField>
+            <FormField label="PAN Number" id="panNumber">
+              <input
+                id="panNumber"
+                type="text"
+                value={form.panNumber}
+                onChange={update('panNumber')}
+                placeholder="e.g. ABCPS1234K"
+                className="input-field uppercase"
+                maxLength={10}
+              />
+            </FormField>
           </FormSection>
         </div>
 

@@ -274,7 +274,7 @@ const registerAdmin = async ({ firstName, lastName, email, phone, password,
       `INSERT INTO employee_profiles
          (user_id, company_id, employee_code, department, designation,
           date_of_joining, employment_type, status)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, 'Full-time', 'Active')`,
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, 'Full-Time', 'Active')`,
       [user.id, company.id, loginId, 'Management', 'Administrator']
     );
 
