@@ -2,18 +2,20 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Plus, Filter, ChevronDown, ChevronLeft, ChevronRight,
-  Mail, Phone, MoreHorizontal, Building2
+  Mail, Phone, MoreHorizontal, Building2, Download
 } from 'lucide-react';
 import { employees } from '../services/api.js';
 
 
 const departments = ['All', 'Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
-const statuses = ['All', 'Active', 'On Leave', 'Inactive'];
+const statuses = ['All', 'Active', 'Inactive', 'On Leave', 'Terminated', 'Resigned'];
 
 const statusBadge = {
   Active: 'badge-approved',
   'On Leave': 'badge-pending',
   Inactive: 'badge-rejected',
+  Terminated: 'badge-rejected',
+  Resigned: 'badge-rejected',
 };
 
 export default function EmployeeDirectory() {
@@ -49,10 +51,13 @@ export default function EmployeeDirectory() {
 
   const filtered = employeeList.filter((emp) => {
     const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
+    const q = search.toLowerCase();
     const matchSearch =
-      fullName.includes(search.toLowerCase()) ||
-      emp.email?.toLowerCase().includes(search.toLowerCase()) ||
-      emp.department?.toLowerCase().includes(search.toLowerCase());
+      fullName.includes(q) ||
+      emp.email?.toLowerCase().includes(q) ||
+      emp.department?.toLowerCase().includes(q) ||
+      emp.designation?.toLowerCase().includes(q) ||
+      emp.employee_code?.toLowerCase().includes(q);
     const matchDept = deptFilter === 'All' || emp.department === deptFilter;
     const matchStatus = statusFilter === 'All' || emp.status === statusFilter;
     return matchSearch && matchDept && matchStatus;
@@ -86,13 +91,36 @@ export default function EmployeeDirectory() {
             {employeeList.length} total employees across {departments.length - 1} departments
           </p>
         </div>
-        <Link
-          to="/app/employees/new"
-          className="btn-primary inline-flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Add Employee
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const rows = [['Name','Email','Department','Designation','Status','Joined']];
+              filtered.forEach(emp => {
+                rows.push([
+                  `${emp.first_name || ''} ${emp.last_name || ''}`,
+                  emp.email || '', emp.department || '', emp.designation || '',
+                  emp.status || '', emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en-IN') : '',
+                ]);
+              });
+              const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = 'employees.csv'; a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="btn-secondary inline-flex items-center gap-2"
+          >
+            <Download size={16} />
+            Export CSV
+          </button>
+          <Link
+            to="/app/employees/new"
+            className="btn-primary inline-flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Add Employee
+          </Link>
+        </div>
       </div>
 
       {/* Search & Filters Bar */}

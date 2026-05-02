@@ -107,12 +107,14 @@ const updateEmployee = async (id, companyId, updates) => {
     currentAddress: 'current_address', panNumber: 'pan_number', aadharNumber: 'aadhar_number',
     bankAccountNumber: 'bank_account_number', bankName: 'bank_name', bankIfsc: 'bank_ifsc',
     dateOfLeaving: 'date_of_leaving', profilePhotoUrl: 'profile_photo_url',
+    skills: 'skills',
+    experience: 'experience',
   };
 
   for (const [key, col] of Object.entries(fieldMap)) {
     if (updates[key] !== undefined) {
       fields.push(`${col} = $${idx++}`);
-      params.push(updates[key]);
+      params.push(key === 'experience' ? JSON.stringify(updates[key]) : updates[key]);
     }
   }
 
@@ -131,7 +133,7 @@ const updateEmployee = async (id, companyId, updates) => {
 
 const { generateSecurePassword, generateLoginId } = require('./auth.service');
 
-const createEmployeeWithUser = async (companyId, { firstName, lastName, email, phone, roleId = 4, dateOfJoining, employmentType, department, designation, managerId, gender, maritalStatus, bloodGroup, dateOfBirth, emergencyContactName, emergencyContactPhone, permanentAddress, panNumber, bankAccountNumber, bankName, bankIfsc }) => {
+const createEmployeeWithUser = async (companyId, { firstName, lastName, email, phone, roleId = 4, dateOfJoining, employmentType, department, designation, managerId, gender, maritalStatus, bloodGroup, dateOfBirth, emergencyContactName, emergencyContactPhone, permanentAddress, panNumber, bankAccountNumber, bankName, bankIfsc, skills }) => {
   const client = await getClient();
   try {
     await client.query('BEGIN');
@@ -166,14 +168,15 @@ const createEmployeeWithUser = async (companyId, { firstName, lastName, email, p
          (user_id, company_id, employee_code, department, designation, date_of_joining,
           employment_type, status, manager_id, date_of_birth, gender, marital_status, blood_group,
           emergency_contact_name, emergency_contact_phone, permanent_address,
-          pan_number, bank_account_number, bank_name, bank_ifsc)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'Active',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          pan_number, bank_account_number, bank_name, bank_ifsc, skills)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'Active',$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING *`,
       [user.id, companyId, loginId, department || null, designation || null,
        dateOfJoining || null, employmentType || 'Full-Time', managerId || null,
        dateOfBirth || null, gender || null, maritalStatus || null, bloodGroup || null,
        emergencyContactName || null, emergencyContactPhone || null, permanentAddress || null,
-       panNumber || null, bankAccountNumber || null, bankName || null, bankIfsc || null]
+       panNumber || null, bankAccountNumber || null, bankName || null, bankIfsc || null,
+       skills && skills.length > 0 ? skills : null]
     );
 
     await client.query('COMMIT');
@@ -235,4 +238,23 @@ const updateMyProfile = async (userId, companyId, updates) => {
   return getEmployeeByUserId(userId, companyId);
 };
 
-module.exports = { getAllEmployees, getEmployeeById, getEmployeeByUserId, createEmployee, updateEmployee, updateMyProfile, createEmployeeWithUser };
+const deleteEmployee = async (id, companyId) => {
+  const emp = await getEmployeeById(id, companyId);
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM employee_profiles WHERE id = $1 AND company_id = $2', [id, companyId]);
+    if (emp.user_id) {
+      await client.query('DELETE FROM users WHERE id = $1', [emp.user_id]);
+    }
+    await client.query('COMMIT');
+    return emp;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+module.exports = { getAllEmployees, getEmployeeById, getEmployeeByUserId, createEmployee, updateEmployee, updateMyProfile, createEmployeeWithUser, deleteEmployee };

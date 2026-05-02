@@ -100,4 +100,13 @@ const updateMyProfile = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllEmployees, getEmployeeById, getMyProfile, updateMyProfile, createEmployee, updateEmployee, createEmployeeWithUser };
+const deleteEmployee = async (req, res, next) => {
+  try {
+    await employeeService.deleteEmployee(parseInt(req.params.id), req.companyId);
+    res.json({ success: true, message: 'Employee deleted.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getAllEmployees, getEmployeeById, getMyProfile, updateMyProfile, createEmployee, updateEmployee, createEmployeeWithUser, deleteEmployee };

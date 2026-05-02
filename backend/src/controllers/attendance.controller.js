@@ -52,4 +52,17 @@ const updateAttendance = async (req, res, next) => {
   }
 };
 
-module.exports = { checkIn, checkOut, getAttendance, updateAttendance };
+const getAttendanceSummary = async (req, res, next) => {
+  try {
+    const { month, year } = req.query;
+    if (!month || !year) return res.status(400).json({ success: false, message: 'month and year are required' });
+    const data = await attendanceService.getAttendanceSummary(req.companyId, {
+      month: parseInt(month), year: parseInt(year),
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { checkIn, checkOut, getAttendance, updateAttendance, getAttendanceSummary };

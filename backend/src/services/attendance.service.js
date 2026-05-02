@@ -192,4 +192,35 @@ const updateAttendance = async (id, companyId, currentUserId, { status, remarks 
   return result.rows[0];
 };
 
-module.exports = { checkIn, checkOut, getAttendance, updateAttendance };
+const getAttendanceSummary = async (companyId, { month, year }) => {
+  const result = await query(
+    `SELECT
+       a.user_id,
+       u.first_name, u.last_name, u.email,
+       ep.department, ep.designation,
+       COUNT(*) AS total_days,
+       COUNT(*) FILTER (WHERE a.status = 'Present') AS present_days,
+       COUNT(*) FILTER (WHERE a.status = 'Absent') AS absent_days,
+       COUNT(*) FILTER (WHERE a.status = 'Half-Day') AS half_days,
+       COUNT(*) FILTER (WHERE a.status = 'Leave') AS leave_days,
+       COUNT(*) FILTER (WHERE a.status = 'Holiday') AS holiday_days,
+       COUNT(*) FILTER (WHERE a.status = 'Week-Off') AS weekoff_days,
+       COALESCE(SUM(a.work_hours), 0) AS total_hours,
+       COALESCE(ROUND(AVG(a.work_hours) FILTER (WHERE a.status = 'Present'), 2), 0) AS avg_hours,
+       COALESCE(SUM(a.late_minutes), 0) AS total_late_minutes,
+       COUNT(*) FILTER (WHERE a.late_minutes > 0) AS late_count,
+       COALESCE(SUM(a.overtime_minutes), 0) AS total_overtime_minutes
+     FROM attendance a
+     INNER JOIN users u ON a.user_id = u.id
+     LEFT JOIN employee_profiles ep ON u.id = ep.user_id
+     WHERE a.company_id = $1
+       AND EXTRACT(MONTH FROM a.date) = $2
+       AND EXTRACT(YEAR FROM a.date) = $3
+     GROUP BY a.user_id, u.first_name, u.last_name, u.email, ep.department, ep.designation
+     ORDER BY u.first_name, u.last_name`,
+    [companyId, month, year]
+  );
+  return result.rows;
+};
+
+module.exports = { checkIn, checkOut, getAttendance, updateAttendance, getAttendanceSummary };

@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Building2, Calendar, Edit,
   MapPin, CreditCard, GraduationCap, DollarSign,
-  User, Briefcase, Clock
+  User, Briefcase, Clock, ChevronDown, Trash2, AlertTriangle
 } from 'lucide-react';
 import { employees, salaryStructures, payroll as payrollApi } from '../services/api.js';
+
+const employeeStatuses = ['Active', 'Inactive', 'On Leave', 'Terminated', 'Resigned'];
+const statusBadgeClass = {
+  Active: 'badge-approved',
+  Inactive: 'badge-rejected',
+  'On Leave': 'badge-pending',
+  Terminated: 'badge-rejected',
+  Resigned: 'badge-rejected',
+};
 
 
 const tabs = [
@@ -34,6 +43,7 @@ function InfoRow({ label, value, icon: Icon }) {
 
 export default function EmployeeProfile() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [emp, setEmp] = useState(null);
   const [sal, setSal] = useState(null);
@@ -41,6 +51,35 @@ export default function EmployeeProfile() {
   const [estimate, setEstimate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await employees.delete(id);
+      navigate('/app/employees');
+    } catch (err) {
+      setError(err.message || 'Failed to delete employee');
+      setShowDeleteModal(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    if (newStatus === emp.status) return;
+    setStatusUpdating(true);
+    try {
+      await employees.update(id, { status: newStatus });
+      setEmp(prev => ({ ...prev, status: newStatus }));
+    } catch (err) {
+      setError(err.message || 'Failed to update status');
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -134,19 +173,79 @@ export default function EmployeeProfile() {
                   <Calendar size={12} />
                   {emp.date_of_joining ? `Joined ${new Date(emp.date_of_joining).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}` : ''}
                 </span>
-                <span className={`badge ${emp.status === 'Active' ? 'badge-approved' : emp.status === 'On Leave' ? 'badge-pending' : 'badge-rejected'}`}>{emp.status || 'Active'}</span>
+                <div className="relative inline-flex">
+                  <select
+                    value={emp.status || 'Active'}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    disabled={statusUpdating}
+                    className={`badge ${statusBadgeClass[emp.status] || 'badge-approved'} appearance-none cursor-pointer pr-6 border-0 outline-none text-caption font-medium`}
+                  >
+                    {employeeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+                </div>
               </div>
             </div>
           </div>
-          <Link
-            to={`/app/employees/${id}/edit`}
-            className="btn-secondary inline-flex items-center gap-2 text-body-sm"
-          >
-            <Edit size={14} />
-            Edit
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/app/employees/${id}/edit`}
+              className="btn-secondary inline-flex items-center gap-2 text-body-sm"
+            >
+              <Edit size={14} />
+              Edit
+            </Link>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-body-sm font-medium text-error border border-error/20 hover:bg-error/10 transition-colors"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-canvas rounded-xl shadow-lg max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-error" />
+              </div>
+              <div>
+                <h3 className="text-title-sm text-ink">Delete Employee</h3>
+                <p className="text-caption text-muted">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-body-sm text-muted mb-6">
+              Are you sure you want to delete <strong>{emp.first_name} {emp.last_name}</strong>? This will permanently remove their profile, attendance records, leave data, and salary information.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="btn-secondary text-body-sm"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-body-sm font-medium text-white bg-error hover:bg-error/90 transition-colors"
+              >
+                {deleting ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                Delete Employee
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-6 p-1 bg-surface-card rounded-lg w-fit">
@@ -231,12 +330,34 @@ export default function EmployeeProfile() {
               {(emp.skills && emp.skills.length > 0) ? emp.skills.map((skill) => (
                 <span
                   key={skill}
-                  className="px-3 py-1.5 bg-surface-card border border-hairline rounded-pill text-body-sm text-ink"
+                  className="px-3 py-1.5 bg-ink text-on-primary rounded-full text-caption font-medium"
                 >
                   {skill}
                 </span>
               )) : <p className="text-body-sm text-muted">No skills listed.</p>}
             </div>
+
+            <h3 className="text-title-sm text-ink mb-4 mt-8">Work Experience</h3>
+            {(emp.experience && emp.experience.length > 0) ? (
+              <div className="flex flex-col gap-4">
+                {emp.experience.map((exp, i) => (
+                  <div key={i} className="border border-hairline rounded-lg p-4 bg-surface-soft/30">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-body-sm font-medium text-ink">{exp.role}</p>
+                        <p className="text-caption text-muted">{exp.company}</p>
+                      </div>
+                      <span className="text-caption text-muted whitespace-nowrap">
+                        {exp.from || '?'} — {exp.to || 'Present'}
+                      </span>
+                    </div>
+                    {exp.description && (
+                      <p className="text-body-sm text-muted mt-2">{exp.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-body-sm text-muted">No experience listed.</p>}
           </div>
         )}
 
