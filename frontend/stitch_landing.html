@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "on-primary-container": "#848484",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#c6c6c7",
+                        "on-background": "#1a1c1c",
+                        "secondary-container": "#dcdddd",
+                        "on-primary-fixed-variant": "#474747",
+                        "tertiary-fixed": "#e4e2e2",
+                        "surface": "#f9f9f9",
+                        "on-surface": "#1a1c1c",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "background": "#f9f9f9",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-container": "#1b1b1b",
+                        "surface-container": "#eeeeee",
+                        "inverse-primary": "#c6c6c6",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed-variant": "#464747",
+                        "inverse-on-surface": "#f0f1f1",
+                        "primary-fixed": "#e2e2e2",
+                        "secondary": "#5d5f5f",
+                        "on-tertiary-fixed": "#1b1c1c",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface-container-low": "#f3f3f4",
+                        "inverse-surface": "#2f3131",
+                        "on-surface-variant": "#4c4546",
+                        "surface-bright": "#f9f9f9",
+                        "primary": "#000000",
+                        "on-secondary": "#ffffff",
+                        "outline-variant": "#cfc4c5",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#1b1b1b",
+                        "surface-container-high": "#e8e8e8",
+                        "on-secondary-container": "#5f6161",
+                        "surface-tint": "#5e5e5e",
+                        "surface-dim": "#dadada",
+                        "tertiary-container": "#1b1c1c",
+                        "outline": "#7e7576",
+                        "surface-container-highest": "#e2e2e2",
+                        "on-secondary-fixed": "#1a1c1c",
+                        "surface-variant": "#e2e2e2",
+                        "on-primary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#454747",
+                        "tertiary": "#000000",
+                        "on-tertiary-container": "#848484",
+                        "tertiary-fixed-dim": "#c7c6c6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "navbar_height": "64px",
+                        "stack_sm": "8px",
+                        "gutter": "24px",
+                        "container_max_width": "1200px",
+                        "section_padding": "120px",
+                        "stack_lg": "32px",
+                        "stack_md": "16px"
+                    },
+                    "fontFamily": {
+                        "label": ["Inter"],
+                        "h1": ["Inter"],
+                        "body-md": ["Inter"],
+                        "button": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h3": ["Inter"],
+                        "h2": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label": ["14px", {"lineHeight": "1", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "h1": ["64px", {"lineHeight": "1.1", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400"}],
+                        "button": ["15px", {"lineHeight": "1", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "letterSpacing": "-0.01em", "fontWeight": "400"}],
+                        "h3": ["32px", {"lineHeight": "1.3", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "h2": ["48px", {"lineHeight": "1.2", "letterSpacing": "-0.03em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .marquee-track {
+            display: flex;
+            width: max-content;
+            animation: scroll 40s linear infinite;
+        }
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md selection:bg-primary-fixed">
+<!-- TopNavBar -->
+<nav class="h-[64px] w-full sticky top-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
+<div class="flex items-center justify-between px-8 w-full max-w-7xl mx-auto h-full">
+<div class="text-xl font-bold tracking-tighter text-black dark:text-white font-h1">EmPay</div>
+<div class="hidden md:flex items-center gap-8 font-inter tracking-tight text-sm font-medium">
+<a class="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors" href="#">Features</a>
+<a class="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors" href="#">Modules</a>
+<a class="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors" href="#">About</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="font-button text-button px-4 py-2 text-zinc-900 dark:text-zinc-50 hover:opacity-80 transition-all">Sign In</button>
+<button class="font-button text-button bg-primary text-on-primary px-6 py-2 rounded-xl active:opacity-80 transition-all">Get Started</button>
+</div>
+</div>
+</nav>
+<main>
+<!-- Hero Section -->
+<section class="max-w-7xl mx-auto px-8 pt-24 pb-32 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+<div class="flex flex-col gap-8">
+<h1 class="font-h1 text-h1 text-black max-w-lg">The smarter way to manage your workforce</h1>
+<p class="font-body-lg text-body-lg text-secondary max-w-md">Streamline attendance, automate payroll, and empower your HR team — all from one platform.</p>
+<div class="flex gap-4">
+<button class="bg-primary text-on-primary font-button text-button px-8 py-4 rounded-xl hover:opacity-90 transition-all">Get Started</button>
+<button class="bg-surface-container-lowest border border-outline-variant text-primary font-button text-button px-8 py-4 rounded-xl hover:bg-surface-container transition-all">Learn More</button>
+</div>
+</div>
+<div class="relative group">
+<div class="bg-white border border-outline-variant rounded-full p-8 shadow-sm overflow-hidden aspect-[4/3] flex flex-col gap-6">
+<!-- Dashboard Mockup -->
+<div class="flex justify-between items-center pb-4 border-b border-surface-container-highest">
+<div class="h-6 w-32 bg-surface-container-highest rounded"></div>
+<div class="flex gap-2">
+<div class="h-8 w-8 rounded-full bg-surface-container-high"></div>
+<div class="h-8 w-8 rounded-full bg-surface-container-high"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-6 border border-outline-variant rounded-xl flex flex-col gap-2">
+<span class="text-xs font-label text-on-primary-container">Total Employees</span>
+<span class="text-2xl font-bold">1,248</span>
+</div>
+<div class="p-6 border border-outline-variant rounded-xl flex flex-col gap-2">
+<span class="text-xs font-label text-on-primary-container">Active Now</span>
+<span class="text-2xl font-bold">842</span>
+</div>
+<div class="p-6 border border-outline-variant rounded-xl flex flex-col gap-2 col-span-2">
+<span class="text-xs font-label text-on-primary-container">Payroll Status</span>
+<div class="flex items-center gap-2">
+<span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+<span class="text-body-md font-medium">Monthly Processing Completed</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Image Overlay Context -->
+<div class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] opacity-10 pointer-events-none">
+<img class="w-full h-full object-contain" data-alt="A clean high-fidelity software interface displaying data analytics and HR management tools. The aesthetic is minimal with a pure white background and thin grey borders. Soft high-key lighting illuminates the dashboard which features clear charts and statistical cards. The color palette is strictly monochrome with subtle green status indicators. The overall mood is professional and efficient." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbvIWpmUc0uuQcn1kAC54naiB9dLbTt4X2BVDoGBjMxeM3OGd1bWi7pi07kiJHPqpyQgrgQTXYqrOfYQHSsAP6pwaELykQXB5RX0mJC6jrrI85ILt9zvLiDuTZsPnQVayZo2gjevk9bM2r-CvnoDNb0ptwFWkvE9VqmO-5JKtk3CS3fzf3hwTuHTMz8TB1NTqMHNd-VeulHL0gcG1DjtjborFwipIOXxZ2-MKefP857rSgu_k8O7-RGO7pxHOkd9OqtCQgm2CqTVs"/>
+</div>
+</div>
+</section>
+<!-- Marquee -->
+<section class="py-12 border-y border-outline-variant bg-white overflow-hidden">
+<div class="marquee-track flex gap-12 items-center">
+<div class="flex gap-12 items-center shrink-0 px-6">
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">event_available</span> Attendance Tracking</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">payments</span> Payroll Processing</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">beach_access</span> Leave Management</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">admin_panel_settings</span> Role-Based Access</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">receipt_long</span> Payslip Generation</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">groups</span> Employee Directory</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">analytics</span> Analytics and Reports</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">account_balance_wallet</span> Salary Breakdown</span>
+</div>
+<!-- Duplicate for seamless loop -->
+<div class="flex gap-12 items-center shrink-0 px-6">
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">event_available</span> Attendance Tracking</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">payments</span> Payroll Processing</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">beach_access</span> Leave Management</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">admin_panel_settings</span> Role-Based Access</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">receipt_long</span> Payslip Generation</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">groups</span> Employee Directory</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">analytics</span> Analytics and Reports</span>
+<span class="flex items-center gap-2 text-secondary font-medium"><span class="material-symbols-outlined">account_balance_wallet</span> Salary Breakdown</span>
+</div>
+</div>
+</section>
+<!-- How It Works -->
+<section class="max-w-7xl mx-auto px-8 py-32">
+<h2 class="font-h2 text-h2 text-center mb-24">How it works</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="flex flex-col gap-6">
+<div class="h-12 w-12 bg-primary text-on-primary flex items-center justify-center font-bold text-xl rounded-lg">1</div>
+<h3 class="font-h3 text-h3">Manage your team</h3>
+<p class="text-secondary">Centralize employee data, profiles, and historical records in one secure location.</p>
+<div class="mt-4 aspect-video bg-surface-container rounded-xl border border-outline-variant p-4">
+<div class="w-full h-full bg-white rounded flex items-center justify-center text-xs text-on-primary-container">Employee List View UI</div>
+</div>
+</div>
+<div class="flex flex-col gap-6">
+<div class="h-12 w-12 bg-primary text-on-primary flex items-center justify-center font-bold text-xl rounded-lg">2</div>
+<h3 class="font-h3 text-h3">Track attendance</h3>
+<p class="text-secondary">Automate check-ins, verify locations, and manage shift schedules effortlessly.</p>
+<div class="mt-4 aspect-video bg-surface-container rounded-xl border border-outline-variant p-4">
+<div class="w-full h-full bg-white rounded flex items-center justify-center text-xs text-on-primary-container">Shift Calendar UI</div>
+</div>
+</div>
+<div class="flex flex-col gap-6">
+<div class="h-12 w-12 bg-primary text-on-primary flex items-center justify-center font-bold text-xl rounded-lg">3</div>
+<h3 class="font-h3 text-h3">Process payroll</h3>
+<p class="text-secondary">Generate accurate payslips, calculate taxes, and disburse salaries with one click.</p>
+<div class="mt-4 aspect-video bg-surface-container rounded-xl border border-outline-variant p-4">
+<div class="w-full h-full bg-white rounded flex items-center justify-center text-xs text-on-primary-container">Payroll Calculator UI</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Benefits -->
+<section class="bg-surface-container-low py-32">
+<div class="max-w-7xl mx-auto px-8">
+<h2 class="font-h2 text-h2 mb-16 max-w-xl">Discover our advanced features</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="bg-white p-8 rounded-full border border-outline-variant hover:border-primary transition-all">
+<div class="mb-6"><span class="material-symbols-outlined text-3xl">key</span></div>
+<h4 class="font-bold text-lg mb-2">Role-based access</h4>
+<p class="text-sm text-secondary">Granular permissions for every admin level.</p>
+</div>
+<div class="bg-white p-8 rounded-full border border-outline-variant hover:border-primary transition-all">
+<div class="mb-6"><span class="material-symbols-outlined text-3xl">monitoring</span></div>
+<h4 class="font-bold text-lg mb-2">Real-time analytics</h4>
+<p class="text-sm text-secondary">Instant insights into workforce performance.</p>
+</div>
+<div class="bg-white p-8 rounded-full border border-outline-variant hover:border-primary transition-all">
+<div class="mb-6"><span class="material-symbols-outlined text-3xl">calendar_today</span></div>
+<h4 class="font-bold text-lg mb-2">Leave management</h4>
+<p class="text-sm text-secondary">Simplify approval workflows and tracking.</p>
+</div>
+<div class="bg-white p-8 rounded-full border border-outline-variant hover:border-primary transition-all">
+<div class="mb-6"><span class="material-symbols-outlined text-3xl">savings</span></div>
+<h4 class="font-bold text-lg mb-2">Salary breakdown</h4>
+<p class="text-sm text-secondary">Detailed transparency for every employee.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Icon Grid -->
+<section class="max-w-7xl mx-auto px-8 py-32">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-16">
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">person_search</span></div>
+<h5 class="font-semibold text-body-md">Employee Directory</h5>
+</div>
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">list_alt</span></div>
+<h5 class="font-semibold text-body-md">Attendance Logs</h5>
+</div>
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">timer_off</span></div>
+<h5 class="font-semibold text-body-md">Time Off Management</h5>
+</div>
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">currency_exchange</span></div>
+<h5 class="font-semibold text-body-md">Payroll Processing</h5>
+</div>
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">history_edu</span></div>
+<h5 class="font-semibold text-body-md">Payslip Generation</h5>
+</div>
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">bar_chart</span></div>
+<h5 class="font-semibold text-body-md">Reports and Analytics</h5>
+</div>
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">settings</span></div>
+<h5 class="font-semibold text-body-md">Settings and Config</h5>
+</div>
+<div class="flex flex-col gap-4 text-center items-center">
+<div class="h-16 w-16 rounded-xl bg-surface-container flex items-center justify-center"><span class="material-symbols-outlined text-2xl">verified_user</span></div>
+<h5 class="font-semibold text-body-md">Secure Authentication</h5>
+</div>
+</div>
+</section>
+<!-- CTA Band -->
+<section class="bg-surface-container-high py-24 text-center">
+<div class="max-w-7xl mx-auto px-8 flex flex-col items-center gap-8">
+<h2 class="font-h2 text-h2">Smarter, simpler HR management</h2>
+<div class="flex gap-4">
+<button class="bg-primary text-on-primary font-button text-button px-10 py-4 rounded-xl hover:opacity-90 transition-all">Get Started</button>
+<button class="bg-white border border-outline-variant text-primary font-button text-button px-10 py-4 rounded-xl hover:bg-surface-container transition-all">Learn More</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-zinc-950 text-white py-16">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-8 px-8 max-w-7xl mx-auto font-inter text-sm leading-relaxed">
+<div class="flex flex-col gap-6">
+<div class="text-lg font-bold tracking-tighter text-white">EmPay</div>
+<p class="text-zinc-400 max-w-xs">Empowering HR teams with surgical precision and minimalist design. © 2024 EmPay HRMS. All rights reserved.</p>
+</div>
+<div class="flex flex-col gap-4">
+<span class="text-white font-medium">Modules</span>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Payroll</a>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Attendance</a>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Analytics</a>
+</div>
+<div class="flex flex-col gap-4">
+<span class="text-white font-medium">Features</span>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Role Management</a>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Reporting</a>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Compliance</a>
+</div>
+<div class="flex flex-col gap-4">
+<span class="text-white font-medium">Resources</span>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">About</a>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Privacy</a>
+<a class="text-zinc-400 hover:text-white transition-colors" href="#">Terms</a>
+</div>
+</div>
+</footer>
+</body></html>
