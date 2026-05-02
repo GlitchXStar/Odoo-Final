@@ -10,14 +10,17 @@ services:
       - ./backend/.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
 
   # Frontend (Nginx + Vite build)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost
     container_name: empay-frontend
     restart: unless-stopped
     depends_on:
