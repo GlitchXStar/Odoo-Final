@@ -63,8 +63,14 @@ export default function MyAttendance() {
       const logs = Array.isArray(response?.data?.attendance) ? response.data.attendance : [];
       const todayIso = toLocalDate(new Date());
       const rec = logs.find(l => l.date && toLocalDate(l.date) === todayIso);
+
+      // Also find any pending checkout from a previous day (cross-midnight)
+      const pendingRec = !rec?.check_in
+        ? logs.find(l => l.check_in && !l.check_out && toLocalDate(l.date) !== todayIso)
+        : null;
+
       setAllLogs(logs);
-      setTodayRecord(rec || null);
+      setTodayRecord(rec || pendingRec || null);
     } catch (err) {
       setError(err.message || 'Failed to load attendance');
     } finally {

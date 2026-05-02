@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, DollarSign } from 'lucide-react';
 import { employees, salaryStructures } from '../services/api.js';
+import DateDropdown from '../components/DateDropdown.jsx';
+
+const SALARY_YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() + 5 - i);
 
 const empty = {
   effectiveFrom: '', effectiveTo: '',
@@ -159,11 +162,29 @@ export default function SalaryEditor() {
             <h3 className="text-title-sm text-ink">Effective Period</h3>
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Effective From" id="effectiveFrom" type="date"
-              value={form.effectiveFrom} onChange={set('effectiveFrom')} required />
-            <Field label="Effective To" id="effectiveTo" type="date"
-              value={form.effectiveTo} onChange={set('effectiveTo')}
-              placeholder="Leave blank for ongoing" />
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="effectiveFrom" className="text-caption text-ink">
+                Effective From <span className="text-error">*</span>
+              </label>
+              <DateDropdown
+                id="effectiveFrom"
+                value={form.effectiveFrom}
+                onChange={(v) => setForm(prev => ({...prev, effectiveFrom: v}))}
+                yearRange={SALARY_YEARS}
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="effectiveTo" className="text-caption text-ink">
+                Effective To
+              </label>
+              <DateDropdown
+                id="effectiveTo"
+                value={form.effectiveTo}
+                onChange={(v) => setForm(prev => ({...prev, effectiveTo: v}))}
+                yearRange={SALARY_YEARS}
+              />
+            </div>
           </div>
 
           {/* Earnings */}

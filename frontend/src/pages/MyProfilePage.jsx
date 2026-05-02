@@ -6,6 +6,7 @@ import {
   CalendarDays, CalendarOff, FileText, X, Save, Loader2
 } from 'lucide-react';
 import { employees, leaves, payroll } from '../services/api.js';
+import DateDropdown from '../components/DateDropdown.jsx';
 
 const InfoRow = ({ label, value, icon: Icon }) => {
   return (
@@ -166,7 +167,11 @@ export default function MyProfilePage() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-caption text-ink">Date of Birth</label>
-                  <input type="date" value={editForm.dateOfBirth || ''} onChange={(e) => setEditForm({...editForm, dateOfBirth: e.target.value})} className="input-field" />
+                  <DateDropdown
+                    id="profileDob"
+                    value={editForm.dateOfBirth || ''}
+                    onChange={(v) => setEditForm({...editForm, dateOfBirth: v})}
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-caption text-ink">Gender</label>

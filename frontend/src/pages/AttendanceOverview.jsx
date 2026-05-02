@@ -4,6 +4,7 @@ import {
   Calendar, Download, AlertCircle, Filter
 } from 'lucide-react';
 import { attendance } from '../services/api.js';
+import DateDropdown from '../components/DateDropdown.jsx';
 import { useAuth } from '../hooks/useAuth.jsx';
 
 const departments = ['All', 'Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
@@ -168,11 +169,10 @@ export default function AttendanceOverview() {
           </div>
           <div className="flex items-center gap-2">
             <Calendar size={16} className="text-muted" />
-            <input
-              type="date"
+            <DateDropdown
+              id="attendanceDate"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="input-field py-1.5 w-auto text-body-sm"
+              onChange={(v) => setSelectedDate(v)}
             />
           </div>
           <div className="relative">

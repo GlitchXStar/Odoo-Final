@@ -11,6 +11,13 @@ export default function HRDashboard() {
   const [recentJoiners, setRecentJoiners] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const now = new Date();
+  const hours = now.getHours();
+  const greeting = hours < 12 ? 'Good morning' : hours < 17 ? 'Good afternoon' : 'Good evening';
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const firstName = user.first_name || user.firstName || 'there';
+
   useEffect(() => {
     (async () => {
       try {
@@ -59,7 +66,7 @@ export default function HRDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-cal text-display-md text-ink">HR Dashboard</h1>
+          <h1 className="font-cal text-display-md text-ink">{greeting}, {firstName}</h1>
           <p className="text-body-sm text-muted mt-1">
             Manage your workforce, handle leave requests, and track employee activity.
           </p>

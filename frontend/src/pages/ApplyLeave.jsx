@@ -4,6 +4,7 @@ import {
   ArrowLeft, Send, Calendar, FileText, ChevronDown
 } from 'lucide-react';
 import { leaves, leaveTypes as leaveTypesApi, leaveBalances } from '../services/api.js';
+import DateDropdown from '../components/DateDropdown.jsx';
 
 export default function ApplyLeave() {
   const navigate = useNavigate();
@@ -140,12 +141,10 @@ export default function ApplyLeave() {
                   <label htmlFor="fromDate" className="text-caption text-ink">
                     From Date <span className="text-error">*</span>
                   </label>
-                  <input
+                  <DateDropdown
                     id="fromDate"
-                    type="date"
                     value={form.fromDate}
-                    onChange={update('fromDate')}
-                    className="input-field"
+                    onChange={(v) => setForm(prev => ({...prev, fromDate: v}))}
                     required
                   />
                 </div>
@@ -153,12 +152,10 @@ export default function ApplyLeave() {
                   <label htmlFor="toDate" className="text-caption text-ink">
                     To Date <span className="text-error">*</span>
                   </label>
-                  <input
+                  <DateDropdown
                     id="toDate"
-                    type="date"
                     value={form.toDate}
-                    onChange={update('toDate')}
-                    className="input-field"
+                    onChange={(v) => setForm(prev => ({...prev, toDate: v}))}
                     required
                   />
                 </div>

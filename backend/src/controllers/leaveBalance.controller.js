@@ -13,8 +13,9 @@ const getBalances = async (req, res, next) => {
   try {
     const { userId, year } = req.query;
 
-    // Employees see only their own
-    const effectiveUserId = req.user.roleName === 'Employee' ? req.user.id : (userId ? parseInt(userId) : undefined);
+    // When no userId is specified, default to the requesting user's own ID
+    // so auto-allocation triggers for every role
+    const effectiveUserId = userId ? parseInt(userId) : req.user.id;
 
     const result = await leaveBalanceService.getBalances(req.companyId, {
       userId: effectiveUserId,

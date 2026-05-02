@@ -5,6 +5,7 @@ import {
   Mail, Phone, MapPin, CreditCard, Calendar, GraduationCap, X, Briefcase, Plus, Trash2, IndianRupee
 } from 'lucide-react';
 import { employees, users, roles as rolesApi, salaryStructures } from '../services/api.js';
+import DateDropdown from '../components/DateDropdown.jsx';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -445,103 +446,23 @@ export default function EmployeeForm() {
               </div>
             </FormField>
             <FormField label="Join Date" id="joinDate" required>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <select
-                    value={form.joinDate ? parseInt(form.joinDate.split('-')[2]) : ''}
-                    onChange={(e) => {
-                      const [y, m] = (form.joinDate || `${new Date().getFullYear()}-01-01`).split('-');
-                      setForm(prev => ({...prev, joinDate: `${y}-${m}-${String(e.target.value).padStart(2,'0')}`}));
-                    }}
-                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
-                    required
-                  >
-                    <option value="" disabled>Day</option>
-                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-                </div>
-                <div className="relative flex-[2]">
-                  <select
-                    value={form.joinDate ? parseInt(form.joinDate.split('-')[1]) : ''}
-                    onChange={(e) => {
-                      const [y, , d] = (form.joinDate || `${new Date().getFullYear()}-01-01`).split('-');
-                      setForm(prev => ({...prev, joinDate: `${y}-${String(e.target.value).padStart(2,'0')}-${d}`}));
-                    }}
-                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
-                    required
-                  >
-                    <option value="" disabled>Month</option>
-                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-                </div>
-                <div className="relative flex-1">
-                  <select
-                    value={form.joinDate ? parseInt(form.joinDate.split('-')[0]) : ''}
-                    onChange={(e) => {
-                      const [, m, d] = (form.joinDate || `${new Date().getFullYear()}-01-01`).split('-');
-                      setForm(prev => ({...prev, joinDate: `${e.target.value}-${m}-${d}`}));
-                    }}
-                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
-                    required
-                  >
-                    <option value="" disabled>Year</option>
-                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-                </div>
-              </div>
+              <DateDropdown
+                id="joinDate"
+                value={form.joinDate}
+                onChange={(v) => setForm(prev => ({...prev, joinDate: v}))}
+                required
+              />
             </FormField>
           </FormSection>
 
           {/* Personal Details */}
           <FormSection title="Personal Details" icon={Calendar}>
             <FormField label="Date of Birth" id="dob">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <select
-                    value={form.dob ? parseInt(form.dob.split('-')[2]) : ''}
-                    onChange={(e) => {
-                      const [y, m] = (form.dob || `${new Date().getFullYear()}-01-01`).split('-');
-                      setForm(prev => ({...prev, dob: `${y}-${m}-${String(e.target.value).padStart(2,'0')}`}));
-                    }}
-                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
-                  >
-                    <option value="" disabled>Day</option>
-                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-                </div>
-                <div className="relative flex-[2]">
-                  <select
-                    value={form.dob ? parseInt(form.dob.split('-')[1]) : ''}
-                    onChange={(e) => {
-                      const [y, , d] = (form.dob || `${new Date().getFullYear()}-01-01`).split('-');
-                      setForm(prev => ({...prev, dob: `${y}-${String(e.target.value).padStart(2,'0')}-${d}`}));
-                    }}
-                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
-                  >
-                    <option value="" disabled>Month</option>
-                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-                </div>
-                <div className="relative flex-1">
-                  <select
-                    value={form.dob ? parseInt(form.dob.split('-')[0]) : ''}
-                    onChange={(e) => {
-                      const [, m, d] = (form.dob || `${new Date().getFullYear()}-01-01`).split('-');
-                      setForm(prev => ({...prev, dob: `${e.target.value}-${m}-${d}`}));
-                    }}
-                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
-                  >
-                    <option value="" disabled>Year</option>
-                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-                </div>
-              </div>
+              <DateDropdown
+                id="dob"
+                value={form.dob}
+                onChange={(v) => setForm(prev => ({...prev, dob: v}))}
+              />
             </FormField>
             <FormField label="Gender" id="gender">
               <div className="relative">
