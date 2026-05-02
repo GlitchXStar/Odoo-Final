@@ -1,0 +1,43 @@
+const attendanceService = require('../services/attendance.service');
+
+const checkIn = async (req, res, next) => {
+  try {
+    const attendance = await attendanceService.checkIn(req.user.id, req.companyId);
+    res.status(201).json({ success: true, message: 'Checked in successfully.', data: attendance });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const checkOut = async (req, res, next) => {
+  try {
+    const attendance = await attendanceService.checkOut(req.user.id, req.companyId);
+    res.json({ success: true, message: 'Checked out successfully.', data: attendance });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getAttendance = async (req, res, next) => {
+  try {
+    const { userId, date, month, year, page, limit } = req.query;
+
+    // Employees can only see their own attendance
+    const effectiveUserId = req.user.roleName === 'Employee' ? req.user.id : (userId ? parseInt(userId) : undefined);
+
+    const result = await attendanceService.getAttendance(req.companyId, {
+      userId: effectiveUserId,
+      date,
+      month: month ? parseInt(month) : undefined,
+      year: year ? parseInt(year) : undefined,
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 50,
+    });
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { checkIn, checkOut, getAttendance };
