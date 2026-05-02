@@ -1,49 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Building2, Calendar, Edit,
   MapPin, CreditCard, GraduationCap, DollarSign,
   User, Briefcase, Clock
 } from 'lucide-react';
+import { employees, salaryStructures, payroll as payrollApi } from '../services/api.js';
 
-// Mock employee data
-const employeeData = {
-  id: 1,
-  name: 'Priya Sharma',
-  email: 'priya.sharma@empay.io',
-  phone: '+91 98765 43210',
-  department: 'Engineering',
-  designation: 'Senior Developer',
-  status: 'active',
-  joined: '2024-01-15',
-  employeeId: 'EMP-001',
-  reportingTo: 'Rajesh Kumar',
-  location: 'Mumbai, India',
-  dob: '1995-06-20',
-  gender: 'Female',
-  maritalStatus: 'Single',
-  bloodGroup: 'O+',
-  address: '42, Andheri West, Mumbai, Maharashtra - 400058',
-  emergencyContact: '+91 98765 11111',
-  emergencyName: 'Ramesh Sharma (Father)',
-  bankName: 'HDFC Bank',
-  accountNumber: 'XXXX XXXX 4521',
-  ifsc: 'HDFC0001234',
-  panNumber: 'ABCPS1234K',
-  skills: ['React', 'Node.js', 'TypeScript', 'Python', 'PostgreSQL', 'Docker'],
-  salary: {
-    basic: 35000,
-    hra: 14000,
-    da: 3500,
-    conveyance: 1600,
-    medical: 1250,
-    special: 2250,
-    gross: 57600,
-    pf: 4200,
-    tax: 2800,
-    net: 50600,
-  },
-};
 
 const tabs = [
   { key: 'overview', label: 'Overview', icon: User },
@@ -72,7 +35,72 @@ function InfoRow({ label, value, icon: Icon }) {
 export default function EmployeeProfile() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('overview');
-  const emp = employeeData; // In production, fetch by id
+  const [emp, setEmp] = useState(null);
+  const [sal, setSal] = useState(null);
+  const [latestPayroll, setLatestPayroll] = useState(null);
+  const [estimate, setEstimate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (id) {
+      fetchEmployee(id);
+    }
+  }, [id]);
+
+  const fetchEmployee = async (employeeId) => {
+    try {
+      setLoading(true);
+      const response = await employees.getById(employeeId);
+      const empData = response?.data || {};
+      setEmp(empData);
+      if (empData.user_id) {
+        const [, payrollRes] = await Promise.allSettled([
+          salaryStructures.getActiveByUser(empData.user_id)
+            .then((r) => setSal(r?.data || r || null))
+            .catch(() => setSal(null)),
+          fetch(`/api/payroll?userId=${empData.user_id}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          }).then(r => r.json()).then(r => {
+            const rows = r?.data;
+            if (Array.isArray(rows) && rows.length > 0) setLatestPayroll(rows[0]);
+          }).catch(() => {})
+        ]);
+        // If no processed payroll, fetch backend estimate
+        const payrollRows = payrollRes?.value;
+        const hasPayroll = Array.isArray(payrollRows) && payrollRows.length > 0;
+        if (!hasPayroll) {
+          payrollApi.estimate(empData.user_id)
+            .then((r) => setEstimate(r?.data || r || null))
+            .catch(() => setEstimate(null));
+        }
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load employee');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!emp) return null;
 
   return (
     <div className="max-w-content mx-auto">
@@ -90,23 +118,23 @@ export default function EmployeeProfile() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-surface-card flex items-center justify-center text-title-lg text-ink font-medium">
-              {emp.name.split(' ').map((n) => n[0]).join('')}
+              {`${emp.first_name?.[0] || ''}${emp.last_name?.[0] || ''}`}
             </div>
             <div>
-              <h1 className="font-cal text-display-sm text-ink">{emp.name}</h1>
+              <h1 className="font-cal text-display-sm text-ink">{emp.first_name} {emp.last_name}</h1>
               <p className="text-body-sm text-muted mt-0.5">
                 {emp.designation} · {emp.department}
               </p>
               <div className="flex items-center gap-4 mt-2">
                 <span className="text-caption text-muted flex items-center gap-1">
                   <Briefcase size={12} />
-                  {emp.employeeId}
+                  {emp.login_id}
                 </span>
                 <span className="text-caption text-muted flex items-center gap-1">
                   <Calendar size={12} />
-                  Joined {new Date(emp.joined).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                  {emp.date_of_joining ? `Joined ${new Date(emp.date_of_joining).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}` : ''}
                 </span>
-                <span className="badge badge-approved">Active</span>
+                <span className={`badge ${emp.status === 'Active' ? 'badge-approved' : emp.status === 'On Leave' ? 'badge-pending' : 'badge-rejected'}`}>{emp.status || 'Active'}</span>
               </div>
             </div>
           </div>
@@ -147,16 +175,16 @@ export default function EmployeeProfile() {
               <div className="space-y-1 divide-y divide-hairline">
                 <InfoRow icon={Mail} label="Email" value={emp.email} />
                 <InfoRow icon={Phone} label="Phone" value={emp.phone} />
-                <InfoRow icon={MapPin} label="Location" value={emp.location} />
+                <InfoRow icon={MapPin} label="Location" value={emp.permanent_address || '—'} />
               </div>
             </div>
             <div className="p-6">
               <h3 className="text-title-sm text-ink mb-4">Work Information</h3>
               <div className="space-y-1 divide-y divide-hairline">
-                <InfoRow icon={Building2} label="Department" value={emp.department} />
-                <InfoRow icon={Briefcase} label="Designation" value={emp.designation} />
-                <InfoRow icon={User} label="Reporting To" value={emp.reportingTo} />
-                <InfoRow icon={Clock} label="Joined" value={new Date(emp.joined).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} />
+                <InfoRow icon={Building2} label="Department" value={emp.department || '—'} />
+                <InfoRow icon={Briefcase} label="Designation" value={emp.designation || '—'} />
+                <InfoRow icon={User} label="Employee Type" value={emp.employment_type || '—'} />
+                <InfoRow icon={Clock} label="Joined" value={emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
               </div>
             </div>
           </div>
@@ -167,18 +195,18 @@ export default function EmployeeProfile() {
             <div className="p-6">
               <h3 className="text-title-sm text-ink mb-4">Personal Details</h3>
               <div className="space-y-1 divide-y divide-hairline">
-                <InfoRow icon={Calendar} label="Date of Birth" value={new Date(emp.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} />
-                <InfoRow icon={User} label="Gender" value={emp.gender} />
-                <InfoRow icon={User} label="Marital Status" value={emp.maritalStatus} />
-                <InfoRow icon={User} label="Blood Group" value={emp.bloodGroup} />
+                <InfoRow icon={Calendar} label="Date of Birth" value={emp.date_of_birth ? new Date(emp.date_of_birth).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
+                <InfoRow icon={User} label="Gender" value={emp.gender || '—'} />
+                <InfoRow icon={User} label="Marital Status" value={emp.marital_status || '—'} />
+                <InfoRow icon={User} label="Blood Group" value={emp.blood_group || '—'} />
               </div>
             </div>
             <div className="p-6">
               <h3 className="text-title-sm text-ink mb-4">Address & Emergency</h3>
               <div className="space-y-1 divide-y divide-hairline">
-                <InfoRow icon={MapPin} label="Address" value={emp.address} />
-                <InfoRow icon={Phone} label="Emergency Contact" value={emp.emergencyContact} />
-                <InfoRow icon={User} label="Emergency Person" value={emp.emergencyName} />
+                <InfoRow icon={MapPin} label="Address" value={emp.permanent_address || '—'} />
+                <InfoRow icon={Phone} label="Emergency Contact" value={emp.emergency_contact_phone || '—'} />
+                <InfoRow icon={User} label="Emergency Person" value={emp.emergency_contact_name || '—'} />
               </div>
             </div>
           </div>
@@ -188,10 +216,10 @@ export default function EmployeeProfile() {
           <div className="p-6 max-w-md">
             <h3 className="text-title-sm text-ink mb-4">Banking Details</h3>
             <div className="space-y-1 divide-y divide-hairline">
-              <InfoRow icon={CreditCard} label="Bank Name" value={emp.bankName} />
-              <InfoRow icon={CreditCard} label="Account Number" value={emp.accountNumber} />
-              <InfoRow icon={CreditCard} label="IFSC Code" value={emp.ifsc} />
-              <InfoRow icon={CreditCard} label="PAN Number" value={emp.panNumber} />
+              <InfoRow icon={CreditCard} label="Bank Name" value={emp.bank_name || '—'} />
+              <InfoRow icon={CreditCard} label="Account Number" value={emp.bank_account_number || '—'} />
+              <InfoRow icon={CreditCard} label="IFSC Code" value={emp.bank_ifsc || '—'} />
+              <InfoRow icon={CreditCard} label="PAN Number" value={emp.pan_number || '—'} />
             </div>
           </div>
         )}
@@ -200,43 +228,79 @@ export default function EmployeeProfile() {
           <div className="p-6">
             <h3 className="text-title-sm text-ink mb-4">Skills & Expertise</h3>
             <div className="flex flex-wrap gap-2">
-              {emp.skills.map((skill) => (
+              {(emp.skills && emp.skills.length > 0) ? emp.skills.map((skill) => (
                 <span
                   key={skill}
                   className="px-3 py-1.5 bg-surface-card border border-hairline rounded-pill text-body-sm text-ink"
                 >
                   {skill}
                 </span>
-              ))}
+              )) : <p className="text-body-sm text-muted">No skills listed.</p>}
             </div>
           </div>
         )}
 
         {activeTab === 'salary' && (
           <div className="p-6">
-            <h3 className="text-title-sm text-ink mb-4">Salary Breakdown</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-title-sm text-ink">Salary Breakdown</h3>
+              <Link to={`/app/employees/${id}/salary`} className="btn-secondary inline-flex items-center gap-2 text-body-sm">
+                <Edit size={14} />
+                Edit Salary
+              </Link>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Earnings */}
               <div>
                 <p className="text-caption text-muted mb-3 uppercase tracking-wide">Earnings</p>
                 <div className="space-y-2">
-                  {[
-                    ['Basic Salary', emp.salary.basic],
-                    ['HRA', emp.salary.hra],
-                    ['DA', emp.salary.da],
-                    ['Conveyance', emp.salary.conveyance],
-                    ['Medical', emp.salary.medical],
-                    ['Special Allowance', emp.salary.special],
-                  ].map(([label, val]) => (
+                  {latestPayroll ? (() => {
+                    const rows = [
+                      ['Basic Salary', latestPayroll.basic],
+                      ['HRA', latestPayroll.hra],
+                      ['Allowances', latestPayroll.allowances],
+                      ['Bonus', latestPayroll.bonus],
+                    ].filter(([, val]) => Number(val) > 0);
+                    const componentGross = rows.reduce((sum, [, val]) => sum + Number(val), 0);
+                    return (
+                      <>
+                        {rows.map(([label, val]) => (
+                          <div key={label} className="flex justify-between text-body-sm">
+                            <span className="text-muted">{label}</span>
+                            <span className="text-ink font-medium">₹{Number(val).toLocaleString()}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-body-sm border-t border-hairline pt-2 mt-2">
+                          <span className="font-medium text-ink">Gross Salary</span>
+                          <span className="font-medium text-ink">₹{componentGross.toLocaleString()}</span>
+                        </div>
+                        {Number(latestPayroll.gross_salary) < componentGross && (
+                          <p className="text-caption text-muted italic mt-1">
+                            Adjusted to ₹{Number(latestPayroll.gross_salary).toLocaleString()} after attendance deductions
+                          </p>
+                        )}
+                      </>
+                    );
+                  })() : sal ? [
+                    ['Basic Salary', sal.basic],
+                    ['HRA', sal.hra],
+                    ['Conveyance', sal.conveyance_allowance],
+                    ['Medical', sal.medical_allowance],
+                    ['Special Allowance', sal.special_allowance],
+                    ['Bonus', sal.bonus],
+                    ['Other Allowances', sal.other_allowances],
+                  ].filter(([, val]) => Number(val) > 0).map(([label, val]) => (
                     <div key={label} className="flex justify-between text-body-sm">
                       <span className="text-muted">{label}</span>
-                      <span className="text-ink font-medium">₹{val.toLocaleString()}</span>
+                      <span className="text-ink font-medium">₹{Number(val).toLocaleString()}</span>
                     </div>
-                  ))}
-                  <div className="flex justify-between text-body-sm border-t border-hairline pt-2 mt-2">
-                    <span className="font-medium text-ink">Gross Salary</span>
-                    <span className="font-medium text-ink">₹{emp.salary.gross.toLocaleString()}</span>
-                  </div>
+                  )) : <p className="text-body-sm text-muted">No salary structure set.</p>}
+                  {!latestPayroll && sal && (
+                    <div className="flex justify-between text-body-sm border-t border-hairline pt-2 mt-2">
+                      <span className="font-medium text-ink">Gross Salary</span>
+                      <span className="font-medium text-ink">₹{Number(sal.gross_salary || 0).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -244,19 +308,37 @@ export default function EmployeeProfile() {
               <div>
                 <p className="text-caption text-muted mb-3 uppercase tracking-wide">Deductions</p>
                 <div className="space-y-2">
-                  {[
-                    ['Provident Fund', emp.salary.pf],
-                    ['Professional Tax', emp.salary.tax],
-                  ].map(([label, val]) => (
-                    <div key={label} className="flex justify-between text-body-sm">
-                      <span className="text-muted">{label}</span>
-                      <span className="text-error font-medium">-₹{val.toLocaleString()}</span>
+                  {(() => {
+                    const src = latestPayroll || estimate;
+                    if (!src) return <p className="text-body-sm text-muted">No salary structure set.</p>;
+                    if (!latestPayroll && estimate) {
+                      return <p className="text-caption text-muted italic mb-2">Estimated (payroll not yet run)</p>;
+                    }
+                  })()}
+                  {(latestPayroll || estimate) ? (
+                    <>
+                      {[
+                        ['Provident Fund', (latestPayroll || estimate).pf_deduction],
+                        ['ESI', (latestPayroll || estimate).esi_deduction],
+                        ['Professional Tax', (latestPayroll || estimate).professional_tax],
+                        ['Income Tax (TDS)', (latestPayroll || estimate).income_tax],
+                      ].filter(([, v]) => Number(v) > 0).map(([label, val]) => (
+                        <div key={label} className="flex justify-between text-body-sm">
+                          <span className="text-muted">{label}</span>
+                          <span className="text-error font-medium">-₹{Number(val).toLocaleString()}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between text-body-sm border-t border-hairline pt-2 mt-2">
+                        <span className="font-medium text-ink">Total Deductions</span>
+                        <span className="font-medium text-error">-₹{Number((latestPayroll || estimate).total_deductions).toLocaleString()}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex justify-between text-body-sm border-t border-hairline pt-2 mt-2">
+                      <span className="font-medium text-ink">Total Deductions</span>
+                      <span className="font-medium text-error">-₹0</span>
                     </div>
-                  ))}
-                  <div className="flex justify-between text-body-sm border-t border-hairline pt-2 mt-2">
-                    <span className="font-medium text-ink">Total Deductions</span>
-                    <span className="font-medium text-error">-₹{(emp.salary.pf + emp.salary.tax).toLocaleString()}</span>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -264,8 +346,12 @@ export default function EmployeeProfile() {
               <div>
                 <p className="text-caption text-muted mb-3 uppercase tracking-wide">Net Pay</p>
                 <div className="bg-surface-card rounded-lg p-5 text-center">
-                  <p className="text-caption text-muted">Take-home Salary</p>
-                  <p className="text-display-sm text-ink font-cal mt-1">₹{emp.salary.net.toLocaleString()}</p>
+                  <p className="text-caption text-muted">
+                    {latestPayroll ? 'Last Processed Salary' : 'Estimated Take-home'}
+                  </p>
+                  <p className="text-display-sm text-ink font-cal mt-1">
+                    ₹{Number((latestPayroll || estimate)?.net_salary || 0).toLocaleString()}
+                  </p>
                   <p className="text-caption text-muted mt-1">per month</p>
                 </div>
               </div>

@@ -11,6 +11,7 @@ const { ROLES } = require('../config/constants');
 router.use(authMiddleware, companyScopeMiddleware);
 
 router.post('/run', roleMiddleware(ROLES.ADMIN, ROLES.PAYROLL_OFFICER), validate(runPayrollSchema), payrollController.runPayroll);
+router.get('/estimate', payrollController.estimatePayroll);
 router.get('/', payrollController.getPayroll);
 
 module.exports = router;

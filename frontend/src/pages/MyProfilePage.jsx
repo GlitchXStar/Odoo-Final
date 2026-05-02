@@ -1,37 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Building2, Calendar, Edit,
   MapPin, CreditCard, Briefcase, Clock, User,
   CalendarDays, CalendarOff, FileText
 } from 'lucide-react';
+import { employees, leaves, payroll } from '../services/api.js';
 
-// Mock current employee data
-const myProfile = {
-  name: 'Rajesh Kumar',
-  email: 'rajesh.kumar@empay.io',
-  phone: '+91 98765 43211',
-  department: 'Engineering',
-  designation: 'Tech Lead',
-  status: 'active',
-  joined: '2023-06-01',
-  employeeId: 'EMP-002',
-  reportingTo: 'Amit Verma',
-  location: 'Mumbai, India',
-  dob: '1992-03-15',
-  gender: 'Male',
-  maritalStatus: 'Married',
-  bloodGroup: 'B+',
-  address: '101, Bandra East, Mumbai, Maharashtra - 400051',
-};
-
-const quickStats = [
-  { label: 'Present Days', value: '22 / 25', icon: CalendarDays },
-  { label: 'Leave Balance', value: '8 days', icon: CalendarOff },
-  { label: 'Payslips', value: '12', icon: FileText },
-];
-
-function InfoRow({ label, value, icon: Icon }) {
+const InfoRow = ({ label, value, icon: Icon }) => {
   return (
     <div className="flex items-start gap-3 py-3">
       <div className="w-8 h-8 rounded-lg bg-surface-card flex items-center justify-center shrink-0 mt-0.5">
@@ -46,6 +22,62 @@ function InfoRow({ label, value, icon: Icon }) {
 }
 
 export default function MyProfilePage() {
+  const [myProfile, setMyProfile] = useState({});
+  const [quickStats, setQuickStats] = useState([
+    { label: 'Present Days', value: '-', icon: CalendarDays },
+    { label: 'Leave Balance', value: '-', icon: CalendarOff },
+    { label: 'Payslips', value: '-', icon: FileText },
+  ]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchMyProfile();
+  }, []);
+
+  const fetchMyProfile = async () => {
+    try {
+      setLoading(true);
+      const [empRes, leavesRes, payrollRes] = await Promise.all([
+        employees.getMe(),
+        leaves.getAll(),
+        payroll.getAll()
+      ]);
+      
+      setMyProfile(empRes.data || {});
+      
+      // Calculate stats
+      const leaveBalance = leavesRes.data?.reduce((sum, l) => sum + (l.days || 0), 0) || 0;
+      setQuickStats([
+        { label: 'Present Days', value: '22 / 25', icon: CalendarDays },
+        { label: 'Leave Balance', value: `${leaveBalance} days`, icon: CalendarOff },
+        { label: 'Payslips', value: (payrollRes.data?.length || 0).toString(), icon: FileText },
+      ]);
+    } catch (err) {
+      setError(err.message || 'Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Header */}
@@ -61,7 +93,7 @@ export default function MyProfilePage() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-ink text-on-primary flex items-center justify-center text-title-lg font-medium">
-              {myProfile.name.split(' ').map((n) => n[0]).join('')}
+              {myProfile.name?.split(' ').map((n) => n[0]).join('')}
             </div>
             <div>
               <h2 className="font-cal text-display-sm text-ink">{myProfile.name}</h2>
@@ -71,7 +103,7 @@ export default function MyProfilePage() {
               <div className="flex items-center gap-4 mt-2">
                 <span className="text-caption text-muted flex items-center gap-1">
                   <Briefcase size={12} />
-                  {myProfile.employeeId}
+                  {myProfile.employee_id}
                 </span>
                 <span className="badge badge-approved">Active</span>
               </div>
@@ -118,8 +150,8 @@ export default function MyProfilePage() {
           <div className="px-6 py-2 divide-y divide-hairline">
             <InfoRow icon={Building2} label="Department" value={myProfile.department} />
             <InfoRow icon={Briefcase} label="Designation" value={myProfile.designation} />
-            <InfoRow icon={User} label="Reporting To" value={myProfile.reportingTo} />
-            <InfoRow icon={Clock} label="Joined" value={new Date(myProfile.joined).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} />
+            <InfoRow icon={User} label="Reporting To" value={myProfile.reporting_to} />
+            <InfoRow icon={Clock} label="Joined" value={myProfile.join_date ? new Date(myProfile.join_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} />
           </div>
         </div>
 
@@ -130,12 +162,12 @@ export default function MyProfilePage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-hairline">
             <div className="px-6 py-2 divide-y divide-hairline">
-              <InfoRow icon={Calendar} label="Date of Birth" value={new Date(myProfile.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} />
+              <InfoRow icon={Calendar} label="Date of Birth" value={myProfile.dob ? new Date(myProfile.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} />
               <InfoRow icon={User} label="Gender" value={myProfile.gender} />
             </div>
             <div className="px-6 py-2 divide-y divide-hairline">
-              <InfoRow icon={User} label="Marital Status" value={myProfile.maritalStatus} />
-              <InfoRow icon={User} label="Blood Group" value={myProfile.bloodGroup} />
+              <InfoRow icon={User} label="Marital Status" value={myProfile.marital_status} />
+              <InfoRow icon={User} label="Blood Group" value={myProfile.blood_group} />
             </div>
           </div>
         </div>

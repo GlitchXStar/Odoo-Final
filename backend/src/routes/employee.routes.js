@@ -13,6 +13,7 @@ router.use(authMiddleware, companyScopeMiddleware);
 router.get('/', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER), employeeController.getAllEmployees);
 router.get('/me', employeeController.getMyProfile);
 router.get('/:id', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER), employeeController.getEmployeeById);
+router.post('/create-with-user', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER), employeeController.createEmployeeWithUser);
 router.post('/', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER), validate(createEmployeeSchema), employeeController.createEmployee);
 router.put('/:id', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER), validate(updateEmployeeSchema), employeeController.updateEmployee);
 

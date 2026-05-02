@@ -1,44 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Filter, ChevronDown, ChevronLeft, ChevronRight,
   Calendar, Download, Plus, ArrowRight
 } from 'lucide-react';
+import { leaves } from '../services/api.js';
 
-const leaveRecords = [
-  { id: 1, employee: 'Priya Sharma', type: 'Casual Leave', from: '2026-05-05', to: '2026-05-06', days: 2, status: 'pending', appliedOn: '2026-05-01' },
-  { id: 2, employee: 'Vikram Singh', type: 'Sick Leave', from: '2026-05-02', to: '2026-05-02', days: 1, status: 'approved', appliedOn: '2026-05-01' },
-  { id: 3, employee: 'Anjali Patel', type: 'Paid Leave', from: '2026-05-10', to: '2026-05-12', days: 3, status: 'pending', appliedOn: '2026-04-30' },
-  { id: 4, employee: 'Sneha Desai', type: 'Casual Leave', from: '2026-04-28', to: '2026-04-29', days: 2, status: 'approved', appliedOn: '2026-04-25' },
-  { id: 5, employee: 'Amit Verma', type: 'Sick Leave', from: '2026-04-22', to: '2026-04-22', days: 1, status: 'rejected', appliedOn: '2026-04-20' },
-  { id: 6, employee: 'Kavita Joshi', type: 'Unpaid Leave', from: '2026-04-15', to: '2026-04-18', days: 4, status: 'approved', appliedOn: '2026-04-10' },
-  { id: 7, employee: 'Arjun Mehta', type: 'Casual Leave', from: '2026-05-15', to: '2026-05-16', days: 2, status: 'pending', appliedOn: '2026-05-02' },
-  { id: 8, employee: 'Rahul Nair', type: 'Paid Leave', from: '2026-04-01', to: '2026-04-03', days: 3, status: 'approved', appliedOn: '2026-03-28' },
-];
-
-const statusBadge = { pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected' };
-const statusLabel = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
-const leaveTypes = ['All', 'Casual Leave', 'Sick Leave', 'Paid Leave', 'Unpaid Leave'];
+const statusBadge = { Pending: 'badge-pending', Approved: 'badge-approved', Rejected: 'badge-rejected' };
+const leaveTypes = ['All', 'Annual Leave', 'Casual Leave', 'Sick Leave', 'Unpaid Leave', 'Maternity Leave', 'Paternity Leave'];
 const statusOptions = ['All', 'Pending', 'Approved', 'Rejected'];
 
-const summaryCards = [
-  { label: 'Total Requests', value: leaveRecords.length, color: 'text-ink' },
-  { label: 'Pending', value: leaveRecords.filter((l) => l.status === 'pending').length, color: 'text-warning' },
-  { label: 'Approved', value: leaveRecords.filter((l) => l.status === 'approved').length, color: 'text-success' },
-  { label: 'Rejected', value: leaveRecords.filter((l) => l.status === 'rejected').length, color: 'text-error' },
-];
-
 export default function TimeOffOverview() {
+  const [leaveRecords, setLeaveRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
 
+  useEffect(() => {
+    fetchLeaves();
+  }, []);
+
+  const fetchLeaves = async () => {
+    try {
+      setLoading(true);
+      const response = await leaves.getAll();
+      const raw = response?.data?.leaves ?? response?.data ?? response;
+      setLeaveRecords(Array.isArray(raw) ? raw : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load leave records');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const summaryCards = [
+    { label: 'Total Requests', value: leaveRecords.length, color: 'text-ink' },
+    { label: 'Pending', value: leaveRecords.filter((l) => l.status === 'Pending').length, color: 'text-warning' },
+    { label: 'Approved', value: leaveRecords.filter((l) => l.status === 'Approved').length, color: 'text-success' },
+    { label: 'Rejected', value: leaveRecords.filter((l) => l.status === 'Rejected').length, color: 'text-error' },
+  ];
+
   const filtered = leaveRecords.filter((rec) => {
-    const matchSearch = rec.employee.toLowerCase().includes(search.toLowerCase());
-    const matchType = typeFilter === 'All' || rec.type === typeFilter;
-    const matchStatus = statusFilter === 'All' || statusLabel[rec.status] === statusFilter;
+    const fullName = `${rec.first_name || ''} ${rec.last_name || ''}`.toLowerCase();
+    const matchSearch = !search || fullName.includes(search.toLowerCase());
+    const matchType = typeFilter === 'All' || rec.leave_type_name === typeFilter;
+    const matchStatus = statusFilter === 'All' || rec.status === statusFilter;
     return matchSearch && matchType && matchStatus;
   });
+
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-content mx-auto">
@@ -124,30 +154,28 @@ export default function TimeOffOverview() {
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
-              {filtered.map((rec) => (
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-body-sm text-muted">No leave records found.</td>
+                </tr>
+              ) : filtered.map((rec) => (
                 <tr key={rec.id} className="hover:bg-surface-soft/50 transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-surface-card flex items-center justify-center text-caption font-medium text-ink">
-                        {rec.employee.split(' ').map((n) => n[0]).join('')}
+                        {`${rec.first_name?.[0] || ''}${rec.last_name?.[0] || ''}`}
                       </div>
-                      <span className="text-body-sm font-medium text-ink">{rec.employee}</span>
+                      <span className="text-body-sm font-medium text-ink">{rec.first_name} {rec.last_name}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-body-sm text-ink">{rec.type}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">
-                    {new Date(rec.from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  </td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">
-                    {new Date(rec.to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  </td>
-                  <td className="px-5 py-3.5 text-body-sm font-medium text-ink">{rec.days}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-ink">{rec.leave_type_name || '—'}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">{fmtDate(rec.start_date)}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">{fmtDate(rec.end_date)}</td>
+                  <td className="px-5 py-3.5 text-body-sm font-medium text-ink">{rec.total_days ?? '—'}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`badge ${statusBadge[rec.status]}`}>{statusLabel[rec.status]}</span>
+                    <span className={`badge ${statusBadge[rec.status] || 'badge-pending'}`}>{rec.status}</span>
                   </td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">
-                    {new Date(rec.appliedOn).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  </td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">{fmtDate(rec.created_at)}</td>
                 </tr>
               ))}
             </tbody>

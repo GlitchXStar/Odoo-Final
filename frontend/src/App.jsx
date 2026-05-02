@@ -19,6 +19,7 @@ import RunPayroll from './pages/RunPayroll';
 import PayslipList from './pages/PayslipList';
 import PayslipDetail from './pages/PayslipDetail';
 import MyPayslip from './pages/MyPayslip';
+import SalaryEditor from './pages/SalaryEditor';
 import ReportsDashboard from './pages/ReportsDashboard';
 import SettingsPage from './pages/SettingsPage';
 
@@ -41,6 +42,7 @@ function App() {
           <Route path="employees/new" element={<EmployeeForm />} />
           <Route path="employees/:id" element={<EmployeeProfile />} />
           <Route path="employees/:id/edit" element={<EmployeeForm />} />
+          <Route path="employees/:id/salary" element={<SalaryEditor />} />
           <Route path="profile" element={<MyProfilePage />} />
 
           {/* Attendance & Time Off */}

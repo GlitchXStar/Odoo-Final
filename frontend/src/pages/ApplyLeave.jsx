@@ -1,18 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Send, Calendar, FileText, ChevronDown
 } from 'lucide-react';
-
-const leaveTypes = [
-  { value: 'casual', label: 'Casual Leave', balance: 6 },
-  { value: 'sick', label: 'Sick Leave', balance: 4 },
-  { value: 'paid', label: 'Paid Leave', balance: 8 },
-  { value: 'unpaid', label: 'Unpaid Leave', balance: '∞' },
-];
+import { leaves, leaveTypes as leaveTypesApi, leaveBalances } from '../services/api.js';
 
 export default function ApplyLeave() {
   const navigate = useNavigate();
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [balances, setBalances] = useState([]);
   const [form, setForm] = useState({
     leaveType: '',
     fromDate: '',
@@ -20,6 +16,31 @@ export default function ApplyLeave() {
     reason: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchLeaveTypesAndBalances();
+  }, []);
+
+  const fetchLeaveTypesAndBalances = async () => {
+    try {
+      const [typesRes, balancesRes] = await Promise.all([
+        leaveTypesApi.getAll(),
+        leaveBalances.getAll()
+      ]);
+      const typesRaw = typesRes?.data ?? typesRes;
+      setLeaveTypes(Array.isArray(typesRaw) ? typesRaw : []);
+      const balRaw = balancesRes?.data ?? balancesRes;
+      setBalances(Array.isArray(balRaw) ? balRaw : []);
+    } catch (err) {
+      setError('Failed to load leave data');
+    }
+  };
+
+  const getBalanceForType = (typeId) => {
+    const bal = balances.find(b => b.leave_type_id === typeId);
+    return bal ? bal.balance : 0;
+  };
 
   const update = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -30,13 +51,23 @@ export default function ApplyLeave() {
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    setError('');
+    try {
+      await leaves.apply({
+        leave_type_id: form.leaveType,
+        from_date: form.fromDate,
+        to_date: form.toDate,
+        reason: form.reason,
+        days: calcDays()
+      });
       navigate('/app/time-off/me');
-    }, 1500);
+    } catch (err) {
+      setError(err.message || 'Failed to submit leave request');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -58,6 +89,12 @@ export default function ApplyLeave() {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form */}
         <div className="lg:col-span-2">
@@ -78,8 +115,8 @@ export default function ApplyLeave() {
                   >
                     <option value="" disabled>Select leave type</option>
                     {leaveTypes.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label} ({t.balance} days remaining)
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({getBalanceForType(t.id)} days remaining)
                       </option>
                     ))}
                   </select>
@@ -173,10 +210,10 @@ export default function ApplyLeave() {
           </div>
           <div className="p-5 space-y-4">
             {leaveTypes.map((type) => (
-              <div key={type.value} className="flex items-center justify-between">
-                <span className="text-body-sm text-ink">{type.label}</span>
+              <div key={type.id} className="flex items-center justify-between">
+                <span className="text-body-sm text-ink">{type.name}</span>
                 <span className="text-body-sm font-medium text-ink">
-                  {type.balance} {typeof type.balance === 'number' ? 'days' : ''}
+                  {getBalanceForType(type.id)} days
                 </span>
               </div>
             ))}

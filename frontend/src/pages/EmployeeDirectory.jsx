@@ -1,54 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Plus, Filter, ChevronDown, ChevronLeft, ChevronRight,
   Mail, Phone, MoreHorizontal, Building2
 } from 'lucide-react';
+import { employees } from '../services/api.js';
 
-const employees = [
-  { id: 1, name: 'Priya Sharma', email: 'priya.sharma@empay.io', phone: '+91 98765 43210', department: 'Engineering', designation: 'Senior Developer', status: 'active', joined: '2024-01-15' },
-  { id: 2, name: 'Rajesh Kumar', email: 'rajesh.kumar@empay.io', phone: '+91 98765 43211', department: 'Engineering', designation: 'Tech Lead', status: 'active', joined: '2023-06-01' },
-  { id: 3, name: 'Anjali Patel', email: 'anjali.patel@empay.io', phone: '+91 98765 43212', department: 'Marketing', designation: 'Marketing Manager', status: 'active', joined: '2023-09-10' },
-  { id: 4, name: 'Vikram Singh', email: 'vikram.singh@empay.io', phone: '+91 98765 43213', department: 'Sales', designation: 'Sales Executive', status: 'on-leave', joined: '2024-03-20' },
-  { id: 5, name: 'Sneha Desai', email: 'sneha.desai@empay.io', phone: '+91 98765 43214', department: 'HR', designation: 'HR Coordinator', status: 'active', joined: '2023-11-05' },
-  { id: 6, name: 'Amit Verma', email: 'amit.verma@empay.io', phone: '+91 98765 43215', department: 'Finance', designation: 'Accountant', status: 'active', joined: '2024-02-12' },
-  { id: 7, name: 'Kavita Joshi', email: 'kavita.joshi@empay.io', phone: '+91 98765 43216', department: 'Operations', designation: 'Operations Lead', status: 'inactive', joined: '2022-08-01' },
-  { id: 8, name: 'Arjun Mehta', email: 'arjun.mehta@empay.io', phone: '+91 98765 43217', department: 'Engineering', designation: 'Junior Developer', status: 'active', joined: '2025-04-28' },
-  { id: 9, name: 'Rahul Nair', email: 'rahul.nair@empay.io', phone: '+91 98765 43218', department: 'Sales', designation: 'Regional Manager', status: 'active', joined: '2023-04-15' },
-  { id: 10, name: 'Meera Iyer', email: 'meera.iyer@empay.io', phone: '+91 98765 43219', department: 'Engineering', designation: 'QA Engineer', status: 'active', joined: '2024-07-01' },
-];
 
 const departments = ['All', 'Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 const statuses = ['All', 'Active', 'On Leave', 'Inactive'];
 
 const statusBadge = {
-  active: 'badge-approved',
-  'on-leave': 'badge-pending',
-  inactive: 'badge-rejected',
-};
-
-const statusLabel = {
-  active: 'Active',
-  'on-leave': 'On Leave',
-  inactive: 'Inactive',
+  Active: 'badge-approved',
+  'On Leave': 'badge-pending',
+  Inactive: 'badge-rejected',
 };
 
 export default function EmployeeDirectory() {
+  const [employeeList, setEmployeeList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
 
-  const filtered = employees.filter((emp) => {
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const response = await employees.getAll();
+      const list = response?.data?.employees ?? response?.data ?? response;
+      setEmployeeList(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load employees');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = employeeList.filter((emp) => {
+    const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.toLowerCase();
     const matchSearch =
-      emp.name.toLowerCase().includes(search.toLowerCase()) ||
-      emp.email.toLowerCase().includes(search.toLowerCase()) ||
-      emp.department.toLowerCase().includes(search.toLowerCase());
+      fullName.includes(search.toLowerCase()) ||
+      emp.email?.toLowerCase().includes(search.toLowerCase()) ||
+      emp.department?.toLowerCase().includes(search.toLowerCase());
     const matchDept = deptFilter === 'All' || emp.department === deptFilter;
-    const matchStatus =
-      statusFilter === 'All' || statusLabel[emp.status] === statusFilter;
+    const matchStatus = statusFilter === 'All' || emp.status === statusFilter;
     return matchSearch && matchDept && matchStatus;
   });
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-content mx-auto">
@@ -57,7 +78,7 @@ export default function EmployeeDirectory() {
         <div>
           <h1 className="font-cal text-display-md text-ink">Employees</h1>
           <p className="text-body-sm text-muted mt-1">
-            {employees.length} total employees across {departments.length - 1} departments
+            {employeeList.length} total employees across {departments.length - 1} departments
           </p>
         </div>
         <Link
@@ -172,11 +193,11 @@ export default function EmployeeDirectory() {
                   <td className="px-5 py-3.5">
                     <Link to={`/app/employees/${emp.id}`} className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-surface-card flex items-center justify-center text-caption font-medium text-ink shrink-0">
-                        {emp.name.split(' ').map((n) => n[0]).join('')}
+                        {`${emp.first_name?.[0] || ''}${emp.last_name?.[0] || ''}`}
                       </div>
                       <div>
                         <p className="text-body-sm font-medium text-ink group-hover:underline">
-                          {emp.name}
+                          {emp.first_name} {emp.last_name}
                         </p>
                         <p className="text-caption text-muted">{emp.email}</p>
                       </div>
@@ -190,16 +211,16 @@ export default function EmployeeDirectory() {
                   </td>
                   <td className="px-5 py-3.5 text-body-sm text-muted">{emp.designation}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`badge ${statusBadge[emp.status]}`}>
-                      {statusLabel[emp.status]}
+                    <span className={`badge ${statusBadge[emp.status] || 'badge-pending'}`}>
+                      {emp.status || '—'}
                     </span>
                   </td>
                   <td className="px-5 py-3.5 text-body-sm text-muted">
-                    {new Date(emp.joined).toLocaleDateString('en-IN', {
+                    {emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en-IN', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
-                    })}
+                    }) : '—'}
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <Link
@@ -225,7 +246,7 @@ export default function EmployeeDirectory() {
         {/* Pagination */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-hairline">
           <span className="text-caption text-muted">
-            Showing {filtered.length} of {employees.length} employees
+            Showing {filtered.length} of {employeeList.length} employees
           </span>
           <div className="flex items-center gap-1">
             <button className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">

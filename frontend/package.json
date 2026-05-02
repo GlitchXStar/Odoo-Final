@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "npm --prefix .. run dev",
+    "install:all": "npm --prefix .. run install:all",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

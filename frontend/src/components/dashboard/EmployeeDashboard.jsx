@@ -1,47 +1,104 @@
+import { useState, useEffect } from 'react';
 import {
   Clock, CalendarOff, DollarSign, FileText,
   ArrowRight, CalendarCheck, CalendarDays
 } from 'lucide-react';
-
-const myStats = [
-  { label: 'Present Days', value: '22', total: '25', icon: CalendarCheck },
-  { label: 'Leave Balance', value: '8', total: '15', icon: CalendarOff },
-  { label: 'This Month Salary', value: '₹57,600', icon: DollarSign },
-];
-
-const attendanceWeek = [
-  { day: 'Mon', status: 'present', time: '09:02 AM' },
-  { day: 'Tue', status: 'present', time: '08:55 AM' },
-  { day: 'Wed', status: 'present', time: '09:10 AM' },
-  { day: 'Thu', status: 'halfday', time: '01:15 PM' },
-  { day: 'Fri', status: 'present', time: '08:48 AM' },
-  { day: 'Sat', status: 'absent', time: '—' },
-  { day: 'Sun', status: 'absent', time: '—' },
-];
-
-const leaveHistory = [
-  { type: 'Casual Leave', from: 'Apr 15', to: 'Apr 16', status: 'approved', days: 2 },
-  { type: 'Sick Leave', from: 'Mar 22', to: 'Mar 22', status: 'approved', days: 1 },
-  { type: 'Casual Leave', from: 'Feb 10', to: 'Feb 12', status: 'approved', days: 3 },
-];
+import { attendance, leaves, leaveBalances, payroll } from '../../services/api.js';
 
 const statusColors = {
-  present: 'bg-success',
-  absent: 'bg-surface-strong',
-  halfday: 'bg-warning',
+  Present: 'bg-success',
+  Absent: 'bg-surface-strong',
+  'Half-Day': 'bg-warning',
+  Leave: 'bg-warning',
+  Holiday: 'bg-surface-card',
 };
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function EmployeeDashboard() {
   const now = new Date();
   const hours = now.getHours();
   const greeting = hours < 12 ? 'Good morning' : hours < 17 ? 'Good afternoon' : 'Good evening';
 
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [leaveHistory, setLeaveHistory] = useState([]);
+  const [balances, setBalances] = useState([]);
+  const [payrollData, setPayrollData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const firstName = user.first_name || user.firstName || 'there';
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [attRes, leaveRes, balRes, payRes] = await Promise.all([
+          attendance.getAll(),
+          leaves.getAll(),
+          leaveBalances.getAll(),
+          payroll.getAll(),
+        ]);
+        const attRaw = attRes?.data?.attendance ?? attRes?.data ?? attRes;
+        setAttendanceData(Array.isArray(attRaw) ? attRaw : []);
+        const leaveRaw = leaveRes?.data?.leaves ?? leaveRes?.data ?? leaveRes;
+        setLeaveHistory(Array.isArray(leaveRaw) ? leaveRaw : []);
+        const balRaw = balRes?.data ?? balRes;
+        setBalances(Array.isArray(balRaw) ? balRaw : []);
+        const payRaw = payRes?.data ?? payRes;
+        setPayrollData(Array.isArray(payRaw) ? payRaw : []);
+      } catch (e) {
+        console.error('Employee dashboard error:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // Build this week's attendance (Mon–Sun)
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay() + 1);
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    return d;
+  });
+  const attendanceWeek = weekDays.map((d) => {
+    const iso = d.toISOString().split('T')[0];
+    const rec = attendanceData.find(a => a.date?.startsWith(iso));
+    const st = rec?.status || (d > today ? null : 'Absent');
+    return {
+      day: DAY_LABELS[d.getDay()],
+      status: st,
+      time: rec?.check_in ? new Date(`1970-01-01T${rec.check_in}`).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—',
+    };
+  });
+
+  const presentDays = attendanceData.filter(a => a.status === 'Present').length;
+  const totalLeaveBalance = balances.reduce((sum, b) => sum + (b.balance || 0), 0);
+  const totalLeaveAllocated = balances.reduce((sum, b) => sum + (b.allocated || b.total || 0), 0);
+  const latestPayroll = payrollData[0] || {};
+
+  const myStats = [
+    { label: 'Present Days', value: presentDays, total: attendanceData.length || '—', icon: CalendarCheck },
+    { label: 'Leave Balance', value: totalLeaveBalance, total: totalLeaveAllocated || '—', icon: CalendarOff },
+    { label: 'This Month Salary', value: latestPayroll.net_salary ? `₹${Number(latestPayroll.net_salary).toLocaleString('en-IN')}` : '—', icon: DollarSign },
+  ];
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Greeting Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="font-cal text-display-md text-ink">{greeting}, Rajesh</h1>
+          <h1 className="font-cal text-display-md text-ink">{greeting}, {firstName}</h1>
           <p className="text-body-sm text-muted mt-1">
             Here's a summary of your work status this month.
           </p>
@@ -92,10 +149,10 @@ export default function EmployeeDashboard() {
                 <div key={day.day} className="flex-1 flex flex-col items-center gap-2">
                   <span className="text-caption text-muted">{day.day}</span>
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${statusColors[day.status]}`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${statusColors[day.status] || 'bg-surface-card'}`}
                   >
-                    {day.status === 'present' && <CalendarCheck size={14} className="text-white" />}
-                    {day.status === 'halfday' && <Clock size={14} className="text-white" />}
+                    {day.status === 'Present' && <CalendarCheck size={14} className="text-white" />}
+                    {(day.status === 'Half-Day' || day.status === 'Leave') && <Clock size={14} className="text-white" />}
                   </div>
                   <span className="text-[11px] text-muted">{day.time}</span>
                 </div>
@@ -114,16 +171,18 @@ export default function EmployeeDashboard() {
             </a>
           </div>
           <div className="divide-y divide-hairline">
-            {leaveHistory.map((leave, i) => (
+            {leaveHistory.length === 0 ? (
+              <p className="px-5 py-8 text-body-sm text-muted text-center">No leave history.</p>
+            ) : leaveHistory.slice(0, 4).map((leave, i) => (
               <div key={i} className="px-5 py-3.5 flex items-center justify-between">
                 <div>
-                  <p className="text-body-sm font-medium text-ink">{leave.type}</p>
+                  <p className="text-body-sm font-medium text-ink">{leave.leave_type_name || leave.type}</p>
                   <p className="text-caption text-muted">
-                    {leave.from} — {leave.to} · {leave.days} day{leave.days > 1 ? 's' : ''}
+                    {leave.start_date ? new Date(leave.start_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : ''} — {leave.end_date ? new Date(leave.end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : ''} · {leave.total_days ?? leave.days ?? 1} day{(leave.total_days ?? leave.days ?? 1) > 1 ? 's' : ''}
                   </p>
                 </div>
-                <span className={`badge badge-${leave.status}`}>
-                  {leave.status.charAt(0).toUpperCase() + leave.status.slice(1)}
+                <span className={`badge badge-${(leave.status || '').toLowerCase()}`}>
+                  {leave.status}
                 </span>
               </div>
             ))}

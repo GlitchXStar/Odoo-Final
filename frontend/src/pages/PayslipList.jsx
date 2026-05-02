@@ -1,34 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, ChevronDown, ChevronLeft, ChevronRight,
   Download, Eye, Calendar
 } from 'lucide-react';
-
-const payslips = [
-  { id: 'PS-2026-04-001', employee: 'Priya Sharma', dept: 'Engineering', month: 'Apr 2026', gross: 57600, deductions: 7000, net: 50600, status: 'paid' },
-  { id: 'PS-2026-04-002', employee: 'Rajesh Kumar', dept: 'Engineering', month: 'Apr 2026', gross: 72000, deductions: 9200, net: 62800, status: 'paid' },
-  { id: 'PS-2026-04-003', employee: 'Anjali Patel', dept: 'Marketing', month: 'Apr 2026', gross: 48000, deductions: 5800, net: 42200, status: 'paid' },
-  { id: 'PS-2026-04-004', employee: 'Vikram Singh', dept: 'Sales', month: 'Apr 2026', gross: 35000, deductions: 4200, net: 30800, status: 'paid' },
-  { id: 'PS-2026-04-005', employee: 'Sneha Desai', dept: 'HR', month: 'Apr 2026', gross: 42000, deductions: 5100, net: 36900, status: 'paid' },
-  { id: 'PS-2026-04-006', employee: 'Amit Verma', dept: 'Finance', month: 'Apr 2026', gross: 55000, deductions: 6800, net: 48200, status: 'paid' },
-  { id: 'PS-2026-04-007', employee: 'Kavita Joshi', dept: 'Operations', month: 'Apr 2026', gross: 60000, deductions: 7500, net: 52500, status: 'paid' },
-  { id: 'PS-2026-04-008', employee: 'Arjun Mehta', dept: 'Engineering', month: 'Apr 2026', gross: 30000, deductions: 3600, net: 26400, status: 'paid' },
-];
+import { payroll } from '../services/api.js';
 
 const departments = ['All', 'Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 
 export default function PayslipList() {
+  const [payslips, setPayslips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
   const [monthFilter, setMonthFilter] = useState('2026-04');
 
+  useEffect(() => {
+    fetchPayslips();
+  }, [monthFilter]);
+
+  const fetchPayslips = async () => {
+    try {
+      setLoading(true);
+      const response = await payroll.getAll();
+      const raw = response?.data ?? response;
+      setPayslips(Array.isArray(raw) ? raw : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load payslips');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filtered = payslips.filter((ps) => {
-    const matchSearch = ps.employee.toLowerCase().includes(search.toLowerCase()) ||
-      ps.id.toLowerCase().includes(search.toLowerCase());
-    const matchDept = deptFilter === 'All' || ps.dept === deptFilter;
-    return matchSearch && matchDept;
+    const fullName = `${ps.first_name || ''} ${ps.last_name || ''}`.toLowerCase();
+    const matchSearch = !search || fullName.includes(search.toLowerCase()) ||
+      String(ps.id).includes(search);
+    const matchDept = deptFilter === 'All' || ps.department === deptFilter;
+    const [fYear, fMonth] = monthFilter.split('-').map(Number);
+    const matchMonth = ps.month === fMonth && ps.year === fYear;
+    return matchSearch && matchDept && matchMonth;
   });
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-content mx-auto">
@@ -98,22 +129,28 @@ export default function PayslipList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
-              {filtered.map((ps) => (
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-body-sm text-muted">No payslips found.</td>
+                </tr>
+              ) : filtered.map((ps) => (
                 <tr key={ps.id} className="hover:bg-surface-soft/50 transition-colors">
-                  <td className="px-5 py-3.5 text-caption font-mono text-muted">{ps.id}</td>
+                  <td className="px-5 py-3.5 text-caption font-mono text-muted">#{ps.id}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-surface-card flex items-center justify-center text-caption font-medium text-ink">
-                        {ps.employee.split(' ').map((n) => n[0]).join('')}
+                        {`${ps.first_name?.[0] || ''}${ps.last_name?.[0] || ''}`}
                       </div>
-                      <span className="text-body-sm font-medium text-ink">{ps.employee}</span>
+                      <span className="text-body-sm font-medium text-ink">{ps.first_name} {ps.last_name}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">{ps.dept}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">{ps.month}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-ink text-right font-medium">₹{ps.gross.toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-error text-right">-₹{ps.deductions.toLocaleString()}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-ink text-right font-medium">₹{ps.net.toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">{ps.department || '—'}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">
+                    {new Date(ps.year, ps.month - 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+                  </td>
+                  <td className="px-5 py-3.5 text-body-sm text-ink text-right font-medium">₹{Number(ps.gross_salary).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-error text-right">-₹{Number(ps.total_deductions).toLocaleString()}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-ink text-right font-medium">₹{Number(ps.net_salary).toLocaleString()}</td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Link

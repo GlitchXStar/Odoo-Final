@@ -1,61 +1,114 @@
+import { useState, useEffect } from 'react';
 import {
   Users, UserCheck, CalendarOff, DollarSign,
   TrendingUp, TrendingDown, Clock, AlertCircle
 } from 'lucide-react';
+import { dashboard } from '../../services/api.js';
 
-const stats = [
-  {
-    label: 'Total Employees',
-    value: '1,248',
-    change: '+12',
-    trend: 'up',
-    icon: Users,
-    period: 'this month',
-  },
-  {
-    label: 'Present Today',
-    value: '1,089',
-    change: '87%',
-    trend: 'up',
-    icon: UserCheck,
-    period: 'attendance rate',
-  },
-  {
-    label: 'On Leave',
-    value: '42',
-    change: '+3',
-    trend: 'neutral',
-    icon: CalendarOff,
-    period: 'today',
-  },
-  {
-    label: 'Payroll This Month',
-    value: '₹42.5L',
-    change: '+4.2%',
-    trend: 'up',
-    icon: DollarSign,
-    period: 'vs last month',
-  },
-];
+const formatPayout = (val) => {
+  const n = parseFloat(val) || 0;
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
+  return `₹${n}`;
+};
 
-const recentActivity = [
-  { user: 'Priya Sharma', action: 'applied for Casual Leave', time: '2 min ago', status: 'pending' },
-  { user: 'Rajesh Kumar', action: 'checked in', time: '15 min ago', status: 'present' },
-  { user: 'Anjali Patel', action: 'payslip generated', time: '1 hour ago', status: 'approved' },
-  { user: 'Vikram Singh', action: 'marked absent', time: '2 hours ago', status: 'absent' },
-  { user: 'Sneha Desai', action: 'applied for Sick Leave', time: '3 hours ago', status: 'pending' },
-];
+const actionLabel = (action) => {
+  const map = {
+    USER_LOGIN: 'logged in',
+    USER_LOGIN_OTP: 'logged in via OTP',
+    ADMIN_REGISTERED: 'registered as admin',
+    USER_CREATED: 'was created',
+    PASSWORD_CHANGED: 'changed their password',
+    LEAVE_APPLIED: 'applied for leave',
+    LEAVE_APPROVED: 'had leave approved',
+    LEAVE_REJECTED: 'had leave rejected',
+    ATTENDANCE_CHECK_IN: 'checked in',
+    ATTENDANCE_CHECK_OUT: 'checked out',
+    PAYROLL_RUN: 'ran payroll',
+  };
+  return map[action] || action?.toLowerCase().replace(/_/g, ' ');
+};
 
-const departmentBreakdown = [
-  { name: 'Engineering', count: 320, percentage: 26 },
-  { name: 'Marketing', count: 180, percentage: 14 },
-  { name: 'Sales', count: 250, percentage: 20 },
-  { name: 'HR', count: 85, percentage: 7 },
-  { name: 'Finance', count: 120, percentage: 10 },
-  { name: 'Operations', count: 293, percentage: 23 },
-];
+const timeAgo = (ts) => {
+  const diff = Date.now() - new Date(ts).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h > 1 ? 's' : ''} ago`;
+  return `${Math.floor(h / 24)} day${Math.floor(h / 24) > 1 ? 's' : ''} ago`;
+};
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState(null);
+  const [departments, setDepartments] = useState([]);
+  const [activity, setActivity] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statsRes, deptRes, actRes] = await Promise.all([
+          dashboard.getStats(),
+          dashboard.getDepartments(),
+          dashboard.getActivity(),
+        ]);
+        setStats(statsRes?.data || statsRes || {});
+        const depts = deptRes?.data ?? deptRes;
+        setDepartments(Array.isArray(depts) ? depts : []);
+        const acts = actRes?.data ?? actRes;
+        setActivity(Array.isArray(acts) ? acts : []);
+      } catch (e) {
+        console.error('Dashboard fetch error:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const emp = stats?.employees || {};
+  const att = stats?.todayAttendance || {};
+  const leaves = stats?.monthlyLeaves || {};
+  const pay = stats?.payrollSummary || {};
+
+  const statCards = [
+    {
+      label: 'Total Employees',
+      value: emp.total_employees ?? '—',
+      change: emp.active_employees ? `${emp.active_employees} active` : '—',
+      trend: 'up', icon: Users, period: '',
+    },
+    {
+      label: 'Present Today',
+      value: att.present_today ?? '—',
+      change: emp.total_employees ? `${Math.round((att.present_today / emp.total_employees) * 100) || 0}%` : '—',
+      trend: 'up', icon: UserCheck, period: 'attendance rate',
+    },
+    {
+      label: 'Pending Leaves',
+      value: leaves.pending_leaves ?? '—',
+      change: `${leaves.approved_leaves ?? 0} approved`,
+      trend: 'neutral', icon: CalendarOff, period: 'this month',
+    },
+    {
+      label: 'Payroll This Year',
+      value: pay.total_payout ? formatPayout(pay.total_payout) : '—',
+      change: pay.total_processed ? `${pay.total_processed} processed` : '—',
+      trend: 'up', icon: DollarSign, period: '',
+    },
+  ];
+
+  const maxDeptCount = departments.length > 0 ? Math.max(...departments.map(d => d.count)) : 1;
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Page Header */}
@@ -79,7 +132,7 @@ export default function AdminDashboard() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map((stat) => (
+        {statCards.map((stat) => (
           <div
             key={stat.label}
             className="bg-canvas border border-hairline rounded-lg p-5 hover:shadow-soft transition-shadow"
@@ -121,23 +174,22 @@ export default function AdminDashboard() {
             </button>
           </div>
           <div className="divide-y divide-hairline">
-            {recentActivity.map((item, i) => (
+            {activity.length === 0 ? (
+              <p className="px-5 py-8 text-body-sm text-muted text-center">No recent activity.</p>
+            ) : activity.slice(0, 5).map((item, i) => (
               <div key={i} className="px-5 py-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-surface-card flex items-center justify-center text-caption font-medium text-ink">
-                    {item.user.charAt(0)}
+                    {item.first_name?.charAt(0) || '?'}
                   </div>
                   <div>
                     <p className="text-body-sm text-ink">
-                      <span className="font-medium">{item.user}</span>{' '}
-                      <span className="text-muted">{item.action}</span>
+                      <span className="font-medium">{item.first_name} {item.last_name}</span>{' '}
+                      <span className="text-muted">{actionLabel(item.action)}</span>
                     </p>
-                    <p className="text-caption text-muted">{item.time}</p>
+                    <p className="text-caption text-muted">{timeAgo(item.timestamp)}</p>
                   </div>
                 </div>
-                <span className={`badge badge-${item.status}`}>
-                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                </span>
               </div>
             ))}
           </div>
@@ -149,16 +201,18 @@ export default function AdminDashboard() {
             <h3 className="text-title-sm text-ink">Department Breakdown</h3>
           </div>
           <div className="p-5 space-y-4">
-            {departmentBreakdown.map((dept) => (
-              <div key={dept.name}>
+            {departments.length === 0 ? (
+              <p className="text-body-sm text-muted text-center py-4">No department data.</p>
+            ) : departments.map((dept) => (
+              <div key={dept.department}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-body-sm text-ink">{dept.name}</span>
+                  <span className="text-body-sm text-ink">{dept.department}</span>
                   <span className="text-caption text-muted">{dept.count}</span>
                 </div>
                 <div className="w-full h-2 bg-surface-card rounded-full overflow-hidden">
                   <div
                     className="h-full bg-ink rounded-full transition-all duration-500"
-                    style={{ width: `${dept.percentage}%` }}
+                    style={{ width: `${Math.round((dept.count / maxDeptCount) * 100)}%` }}
                   />
                 </div>
               </div>

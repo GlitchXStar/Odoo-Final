@@ -1,16 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Download, Calendar, ChevronDown, Users, DollarSign,
   CalendarDays, CalendarOff, TrendingUp, BarChart3,
   PieChart, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
-
-const reportCards = [
-  { label: 'Total Employees', value: '1,248', change: '+12', trend: 'up', icon: Users },
-  { label: 'Avg. Attendance', value: '87%', change: '+2.3%', trend: 'up', icon: CalendarDays },
-  { label: 'Leave Utilization', value: '62%', change: '-5%', trend: 'down', icon: CalendarOff },
-  { label: 'Payroll Cost', value: '₹52.3L', change: '+3.8%', trend: 'up', icon: DollarSign },
-];
+import { dashboard } from '../services/api.js';
 
 const departmentData = [
   { dept: 'Engineering', headcount: 320, attendance: 91, leaveRate: 8, avgSalary: '₹68K' },
@@ -34,6 +28,13 @@ const topLeaveTypes = [
   { type: 'Sick Leave', count: 213, percentage: 25 },
   { type: 'Paid Leave', count: 171, percentage: 20 },
   { type: 'Unpaid Leave', count: 128, percentage: 15 },
+];
+
+const reportCards = [
+  { label: 'Total Employees', value: '1,248', icon: Users, trend: 'up', change: '+2.4% this month' },
+  { label: 'Avg Attendance', value: '87%', icon: CalendarDays, trend: 'up', change: '+1.2% this month' },
+  { label: 'Leave Requests', value: '854', icon: CalendarOff, trend: 'down', change: '-3.1% this month' },
+  { label: 'Payroll Cost', value: '₹52.3L', icon: DollarSign, trend: 'up', change: '+1.6% this month' },
 ];
 
 const quickReports = [

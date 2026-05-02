@@ -1,34 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Clock, LogIn, LogOut, CalendarDays, CalendarCheck,
   ChevronLeft, ChevronRight, ArrowRight
 } from 'lucide-react';
+import { attendance } from '../services/api.js';
 
-const todayStatus = {
-  checkedIn: true,
-  checkInTime: '09:02 AM',
-  checkOutTime: null,
-  date: new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
-};
-
-const monthlySummary = {
-  present: 22,
-  absent: 1,
-  halfDay: 1,
-  leave: 1,
-  totalWorking: 25,
-};
-
-const recentLogs = [
-  { date: 'May 2, 2026', day: 'Fri', checkIn: '09:02 AM', checkOut: '—', hours: '—', status: 'present' },
-  { date: 'May 1, 2026', day: 'Thu', checkIn: '08:55 AM', checkOut: '06:30 PM', hours: '9h 35m', status: 'present' },
-  { date: 'Apr 30, 2026', day: 'Wed', checkIn: '09:10 AM', checkOut: '06:00 PM', hours: '8h 50m', status: 'present' },
-  { date: 'Apr 29, 2026', day: 'Tue', checkIn: '01:15 PM', checkOut: '06:00 PM', hours: '4h 45m', status: 'halfday' },
-  { date: 'Apr 28, 2026', day: 'Mon', checkIn: '08:48 AM', checkOut: '05:50 PM', hours: '9h 02m', status: 'present' },
-  { date: 'Apr 25, 2026', day: 'Fri', checkIn: '—', checkOut: '—', hours: '—', status: 'absent' },
-  { date: 'Apr 24, 2026', day: 'Thu', checkIn: '09:00 AM', checkOut: '06:20 PM', hours: '9h 20m', status: 'present' },
-  { date: 'Apr 23, 2026', day: 'Wed', checkIn: '—', checkOut: '—', hours: '—', status: 'leave' },
-];
 
 const statusBadge = {
   present: 'badge-present',
@@ -45,7 +21,85 @@ const statusLabel = {
 };
 
 export default function MyAttendance() {
-  const [isCheckedIn, setIsCheckedIn] = useState(todayStatus.checkedIn);
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [todayStatus, setTodayStatus] = useState(null);
+  const [recentLogs, setRecentLogs] = useState([]);
+  const [monthlySummary, setMonthlySummary] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchAttendance();
+  }, []);
+
+  const fetchAttendance = async () => {
+    try {
+      setLoading(true);
+      const response = await attendance.getAll();
+      const raw = response?.data?.attendance ?? response?.data ?? response;
+      const logs = Array.isArray(raw) ? raw : [];
+      setRecentLogs(logs);
+      
+      // Calculate today's status
+      const today = new Date().toISOString().split('T')[0];
+      const todayLog = logs.find(l => l.date === today);
+      if (todayLog) {
+        setIsCheckedIn(todayLog.check_out_time ? false : !!todayLog.check_in_time);
+        setTodayStatus(todayLog);
+      }
+      
+      // Calculate monthly summary
+      setMonthlySummary({
+        present: logs.filter(l => l.status === 'present').length,
+        absent: logs.filter(l => l.status === 'absent').length,
+        halfDay: logs.filter(l => l.status === 'halfday').length,
+        leave: logs.filter(l => l.status === 'leave').length,
+        totalWorking: logs.length,
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to load attendance');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    try {
+      await attendance.checkIn();
+      setIsCheckedIn(true);
+      fetchAttendance();
+    } catch (err) {
+      setError(err.message || 'Check-in failed');
+    }
+  };
+
+  const handleCheckOut = async () => {
+    try {
+      await attendance.checkOut();
+      setIsCheckedIn(false);
+      fetchAttendance();
+    } catch (err) {
+      setError(err.message || 'Check-out failed');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-content mx-auto">

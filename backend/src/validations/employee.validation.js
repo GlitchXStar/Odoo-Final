@@ -2,7 +2,7 @@ const Joi = require('joi');
 
 const createEmployeeSchema = Joi.object({
   userId: Joi.number().integer().positive().required(),
-  employeeCode: Joi.string().max(50).required(),
+  employeeCode: Joi.string().max(50).allow(null, ''),
   department: Joi.string().max(100).allow(null, ''),
   designation: Joi.string().max(100).allow(null, ''),
   dateOfJoining: Joi.date().iso().required(),
@@ -31,6 +31,7 @@ const updateEmployeeSchema = Joi.object({
   managerId: Joi.number().integer().positive().allow(null),
   dateOfBirth: Joi.date().iso(),
   gender: Joi.string().valid('Male', 'Female', 'Other', 'Prefer not to say'),
+  maritalStatus: Joi.string().valid('Single', 'Married', 'Divorced', 'Widowed'),
   bloodGroup: Joi.string().max(5),
   emergencyContactName: Joi.string().max(100),
   emergencyContactPhone: Joi.string().max(20),

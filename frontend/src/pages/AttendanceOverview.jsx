@@ -1,56 +1,109 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Search, Filter, ChevronDown, ChevronLeft, ChevronRight,
-  Calendar, Download, Clock
+  Search, ChevronDown, ChevronLeft, ChevronRight,
+  Calendar, Download
 } from 'lucide-react';
+import { attendance } from '../services/api.js';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 const months = ['January', 'February', 'March', 'April', 'May'];
 const departments = ['All', 'Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 
-const attendanceData = [
-  { id: 1, name: 'Priya Sharma', dept: 'Engineering', date: '2026-05-02', checkIn: '09:02 AM', checkOut: '06:15 PM', hours: '9h 13m', status: 'present' },
-  { id: 2, name: 'Rajesh Kumar', dept: 'Engineering', date: '2026-05-02', checkIn: '08:55 AM', checkOut: '06:30 PM', hours: '9h 35m', status: 'present' },
-  { id: 3, name: 'Anjali Patel', dept: 'Marketing', date: '2026-05-02', checkIn: '—', checkOut: '—', hours: '—', status: 'absent' },
-  { id: 4, name: 'Vikram Singh', dept: 'Sales', date: '2026-05-02', checkIn: '—', checkOut: '—', hours: '—', status: 'leave' },
-  { id: 5, name: 'Sneha Desai', dept: 'HR', date: '2026-05-02', checkIn: '09:10 AM', checkOut: '06:00 PM', hours: '8h 50m', status: 'present' },
-  { id: 6, name: 'Amit Verma', dept: 'Finance', date: '2026-05-02', checkIn: '01:15 PM', checkOut: '06:00 PM', hours: '4h 45m', status: 'halfday' },
-  { id: 7, name: 'Kavita Joshi', dept: 'Operations', date: '2026-05-02', checkIn: '09:00 AM', checkOut: '06:20 PM', hours: '9h 20m', status: 'present' },
-  { id: 8, name: 'Arjun Mehta', dept: 'Engineering', date: '2026-05-02', checkIn: '08:48 AM', checkOut: '05:50 PM', hours: '9h 02m', status: 'present' },
-  { id: 9, name: 'Rahul Nair', dept: 'Sales', date: '2026-05-02', checkIn: '09:30 AM', checkOut: '06:45 PM', hours: '9h 15m', status: 'present' },
-  { id: 10, name: 'Meera Iyer', dept: 'Engineering', date: '2026-05-02', checkIn: '—', checkOut: '—', hours: '—', status: 'absent' },
-];
-
 const statusBadge = {
-  present: 'badge-present',
-  absent: 'badge-absent',
-  leave: 'badge-leave',
-  halfday: 'badge-halfday',
+  Present: 'badge-approved',
+  Absent: 'badge-rejected',
+  Leave: 'badge-pending',
+  'Half-Day': 'badge-pending',
+  Holiday: 'badge-approved',
 };
 
-const statusLabel = {
-  present: 'Present',
-  absent: 'Absent',
-  leave: 'On Leave',
-  halfday: 'Half Day',
-};
-
-const summaryCards = [
-  { label: 'Present', value: 6, color: 'text-success' },
-  { label: 'Absent', value: 2, color: 'text-error' },
-  { label: 'On Leave', value: 1, color: 'text-[#8b5cf6]' },
-  { label: 'Half Day', value: 1, color: 'text-warning' },
-];
+const STATUSES = ['Present', 'Absent', 'Half-Day', 'Leave', 'Holiday', 'Week-Off'];
 
 export default function AttendanceOverview() {
+  const { user } = useAuth();
+  const roleName = user?.role_name || user?.roleName || '';
+  const isHR = roleName === 'Admin' || roleName === 'HR Officer';
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
-  const [selectedDate, setSelectedDate] = useState('2026-05-02');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [updating, setUpdating] = useState(null);
 
-  const filtered = attendanceData.filter((emp) => {
-    const matchSearch = emp.name.toLowerCase().includes(search.toLowerCase());
-    const matchDept = deptFilter === 'All' || emp.dept === deptFilter;
+  useEffect(() => {
+    fetchAttendance();
+  }, [selectedDate]);
+
+  const fetchAttendance = async () => {
+    try {
+      setLoading(true);
+      const params = selectedDate ? `?date=${selectedDate}` : '';
+      const response = await attendance.getAll(params);
+      const list = response?.data?.attendance ?? response?.data ?? response;
+      setAttendanceData(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load attendance');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (rec, newStatus) => {
+    if (newStatus === rec.status) return;
+    setUpdating(rec.id);
+    try {
+      await attendance.update(rec.id, { status: newStatus });
+      setAttendanceData((prev) =>
+        prev.map((r) => r.id === rec.id ? { ...r, status: newStatus } : r)
+      );
+    } catch (err) {
+      alert(err.message || 'Failed to update status');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const summaryCards = [
+    { label: 'Present', value: attendanceData.filter(a => a.status === 'Present').length, color: 'text-success' },
+    { label: 'Absent', value: attendanceData.filter(a => a.status === 'Absent').length, color: 'text-error' },
+    { label: 'On Leave', value: attendanceData.filter(a => a.status === 'Leave').length, color: 'text-[#8b5cf6]' },
+    { label: 'Half Day', value: attendanceData.filter(a => a.status === 'Half-Day').length, color: 'text-warning' },
+  ];
+
+  const filtered = attendanceData.filter((rec) => {
+    const fullName = `${rec.first_name || ''} ${rec.last_name || ''}`.toLowerCase();
+    const matchSearch = !search || fullName.includes(search.toLowerCase()) || rec.email?.toLowerCase().includes(search.toLowerCase());
+    const matchDept = deptFilter === 'All' || rec.department === deptFilter;
     return matchSearch && matchDept;
   });
+
+  const fmtTime = (t) => {
+    if (!t) return '—';
+    try {
+      const d = new Date(t);
+      if (isNaN(d)) return '—';
+      return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    } catch { return '—'; }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-content mx-auto">
@@ -127,40 +180,62 @@ export default function AttendanceOverview() {
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Check Out</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Hours</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Status</th>
+                {isHR && <th className="text-left px-5 py-3 text-caption text-muted font-medium">Override</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
-              {filtered.map((emp) => (
-                <tr key={emp.id} className="hover:bg-surface-soft/50 transition-colors">
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-body-sm text-muted">No attendance records found.</td>
+                </tr>
+              ) : filtered.map((rec) => (
+                <tr key={rec.id} className="hover:bg-surface-soft/50 transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-surface-card flex items-center justify-center text-caption font-medium text-ink">
-                        {emp.name.split(' ').map((n) => n[0]).join('')}
+                        {`${rec.first_name?.[0] || ''}${rec.last_name?.[0] || ''}`}
                       </div>
-                      <span className="text-body-sm font-medium text-ink">{emp.name}</span>
+                      <span className="text-body-sm font-medium text-ink">{rec.first_name} {rec.last_name}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">{emp.dept}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">{rec.department || '—'}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`text-body-sm ${emp.checkIn === '—' ? 'text-muted' : 'text-ink'}`}>
-                      {emp.checkIn}
+                    <span className={`text-body-sm ${!rec.check_in ? 'text-muted' : 'text-ink'}`}>
+                      {fmtTime(rec.check_in)}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`text-body-sm ${emp.checkOut === '—' ? 'text-muted' : 'text-ink'}`}>
-                      {emp.checkOut}
+                    <span className={`text-body-sm ${!rec.check_out ? 'text-muted' : 'text-ink'}`}>
+                      {fmtTime(rec.check_out)}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`text-body-sm font-medium ${emp.hours === '—' ? 'text-muted' : 'text-ink'}`}>
-                      {emp.hours}
+                    <span className={`text-body-sm font-medium ${!rec.work_hours ? 'text-muted' : 'text-ink'}`}>
+                      {rec.work_hours ? `${Number(rec.work_hours).toFixed(1)}h` : '—'}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`badge ${statusBadge[emp.status]}`}>
-                      {statusLabel[emp.status]}
+                    <span className={`badge ${statusBadge[rec.status] || 'badge-pending'}`}>
+                      {rec.status || '—'}
                     </span>
                   </td>
+                  {isHR && (
+                    <td className="px-5 py-3.5">
+                      <div className="relative">
+                        <select
+                          value={rec.status || ''}
+                          onChange={(e) => handleStatusChange(rec, e.target.value)}
+                          disabled={updating === rec.id}
+                          className="input-field py-1 pr-7 text-caption appearance-none cursor-pointer w-32"
+                        >
+                          {STATUSES.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

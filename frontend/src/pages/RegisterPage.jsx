@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, ChevronDown } from 'lucide-react';
+import { auth } from '../services/api.js';
 
 const roles = [
   { value: 'employee', label: 'Employee' },
@@ -10,25 +11,63 @@ const roles = [
 ];
 
 export default function RegisterPage() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: '',
+    companyName: '',
+    companyCode: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const update = (field) => (e) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const splitName = (fullName) => {
+    const parts = fullName.trim().split(/\s+/);
+    return {
+      firstName: parts[0] || '',
+      lastName: parts.slice(1).join(' ') || parts[0] || '',
+    };
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
     setIsLoading(true);
-    // TODO: Connect to backend API
-    setTimeout(() => setIsLoading(false), 1500);
+    setError('');
+    try {
+      const { firstName, lastName } = splitName(formData.fullName);
+      await auth.register({
+        firstName,
+        lastName,
+        email: formData.email,
+        password: formData.password,
+        phone: '',
+        companyName: formData.companyName,
+        companyCode: formData.companyCode,
+        companyEmail: formData.email,
+        companyPhone: '',
+        companyAddress: '',
+        companyCity: '',
+        companyState: '',
+        companyCountry: 'India',
+        companyPincode: '',
+      });
+      navigate('/login');
+    } catch (err) {
+      setError(err.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -82,6 +121,12 @@ export default function RegisterPage() {
             </p>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Full Name */}
             <div className="flex flex-col gap-1.5">
@@ -115,33 +160,36 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Role Selector */}
+            {/* Company Name */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="reg-role" className="text-caption text-ink">
-                Role
+              <label htmlFor="reg-company" className="text-caption text-ink">
+                Company name
               </label>
-              <div className="relative">
-                <select
-                  id="reg-role"
-                  value={formData.role}
-                  onChange={update('role')}
-                  className="input-field appearance-none pr-10 cursor-pointer"
-                  required
-                >
-                  <option value="" disabled>
-                    Select your role
-                  </option>
-                  {roles.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={16}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
-                />
-              </div>
+              <input
+                id="reg-company"
+                type="text"
+                value={formData.companyName}
+                onChange={update('companyName')}
+                placeholder="Acme Pvt Ltd"
+                className="input-field"
+                required
+              />
+            </div>
+
+            {/* Company Code */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="reg-company-code" className="text-caption text-ink">
+                Company code
+              </label>
+              <input
+                id="reg-company-code"
+                type="text"
+                value={formData.companyCode}
+                onChange={update('companyCode')}
+                placeholder="ACME"
+                className="input-field"
+                required
+              />
             </div>
 
             {/* Password */}

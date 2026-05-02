@@ -1,29 +1,59 @@
+import { useState, useEffect } from 'react';
 import {
   Users, UserCheck, CalendarOff, AlertCircle,
   TrendingUp, ArrowRight, Clock
 } from 'lucide-react';
-
-const hrStats = [
-  { label: 'Total Employees', value: '1,248', change: '+12 this month', trend: 'up', icon: Users },
-  { label: 'Active Today', value: '1,089', change: '87% attendance', trend: 'up', icon: UserCheck },
-  { label: 'Pending Leaves', value: '7', change: 'needs approval', trend: 'alert', icon: CalendarOff },
-  { label: 'New Joiners', value: '5', change: 'this month', trend: 'up', icon: AlertCircle },
-];
-
-const pendingLeaves = [
-  { employee: 'Priya Sharma', type: 'Casual Leave', from: 'May 5', to: 'May 6', days: 2 },
-  { employee: 'Amit Verma', type: 'Sick Leave', from: 'May 3', to: 'May 3', days: 1 },
-  { employee: 'Sneha Desai', type: 'Casual Leave', from: 'May 7', to: 'May 9', days: 3 },
-  { employee: 'Vikram Singh', type: 'Paid Leave', from: 'May 10', to: 'May 12', days: 3 },
-];
-
-const recentJoiners = [
-  { name: 'Arjun Mehta', department: 'Engineering', joined: 'Apr 28' },
-  { name: 'Kavita Joshi', department: 'Marketing', joined: 'Apr 25' },
-  { name: 'Rahul Nair', department: 'Sales', joined: 'Apr 22' },
-];
+import { dashboard, leaves, employees } from '../../services/api.js';
 
 export default function HRDashboard() {
+  const [stats, setStats] = useState(null);
+  const [pendingLeaves, setPendingLeaves] = useState([]);
+  const [recentJoiners, setRecentJoiners] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statsRes, leavesRes, empRes] = await Promise.all([
+          dashboard.getStats(),
+          leaves.getAll(),
+          employees.getAll(),
+        ]);
+        setStats(statsRes?.data || statsRes || {});
+        const leavesRaw = leavesRes?.data?.leaves ?? leavesRes?.data ?? leavesRes;
+        const allLeaves = Array.isArray(leavesRaw) ? leavesRaw : [];
+        setPendingLeaves(allLeaves.filter(l => l.status === 'Pending').slice(0, 5));
+        const empRaw = empRes?.data?.employees ?? empRes?.data ?? empRes;
+        const allEmp = Array.isArray(empRaw) ? empRaw : [];
+        const sorted = [...allEmp].sort((a, b) => new Date(b.date_of_joining) - new Date(a.date_of_joining));
+        setRecentJoiners(sorted.slice(0, 5));
+      } catch (e) {
+        console.error('HR Dashboard fetch error:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const emp = stats?.employees || {};
+  const att = stats?.todayAttendance || {};
+  const leaveStats = stats?.monthlyLeaves || {};
+
+  const hrStats = [
+    { label: 'Total Employees', value: emp.total_employees ?? '—', change: `${emp.active_employees ?? 0} active`, trend: 'up', icon: Users },
+    { label: 'Active Today', value: att.present_today ?? '—', change: emp.total_employees ? `${Math.round((att.present_today / emp.total_employees) * 100) || 0}% attendance` : '—', trend: 'up', icon: UserCheck },
+    { label: 'Pending Leaves', value: leaveStats.pending_leaves ?? '—', change: 'needs approval', trend: 'alert', icon: CalendarOff },
+    { label: 'New Joiners', value: recentJoiners.length, change: 'recent', trend: 'up', icon: AlertCircle },
+  ];
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Header */}
@@ -81,16 +111,18 @@ export default function HRDashboard() {
             </a>
           </div>
           <div className="divide-y divide-hairline">
-            {pendingLeaves.map((leave, i) => (
+            {pendingLeaves.length === 0 ? (
+              <p className="px-5 py-8 text-body-sm text-muted text-center">No pending leave requests.</p>
+            ) : pendingLeaves.map((leave, i) => (
               <div key={i} className="px-5 py-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-surface-card flex items-center justify-center text-caption font-medium text-ink">
-                    {leave.employee.charAt(0)}
+                    {(leave.employee_name || leave.first_name || '?').charAt(0)}
                   </div>
                   <div>
-                    <p className="text-body-sm font-medium text-ink">{leave.employee}</p>
+                    <p className="text-body-sm font-medium text-ink">{leave.employee_name || `${leave.first_name || ''} ${leave.last_name || ''}`}</p>
                     <p className="text-caption text-muted">
-                      {leave.type} · {leave.from} — {leave.to} · {leave.days} day{leave.days > 1 ? 's' : ''}
+                      {leave.leave_type_name || leave.type} · {leave.start_date ? new Date(leave.start_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : ''} — {leave.end_date ? new Date(leave.end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : ''} · {leave.total_days ?? leave.days ?? 1} day{(leave.total_days ?? leave.days ?? 1) > 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
@@ -113,16 +145,18 @@ export default function HRDashboard() {
             <h3 className="text-title-sm text-ink">Recent Joiners</h3>
           </div>
           <div className="divide-y divide-hairline">
-            {recentJoiners.map((joiner, i) => (
+            {recentJoiners.length === 0 ? (
+              <p className="px-5 py-8 text-body-sm text-muted text-center">No recent joiners.</p>
+            ) : recentJoiners.map((joiner, i) => (
               <div key={i} className="px-5 py-3.5 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-surface-card flex items-center justify-center text-body-sm font-medium text-ink">
-                  {joiner.name.charAt(0)}
+                  {(joiner.first_name || joiner.name || '?').charAt(0)}
                 </div>
                 <div className="flex-1">
-                  <p className="text-body-sm font-medium text-ink">{joiner.name}</p>
+                  <p className="text-body-sm font-medium text-ink">{joiner.first_name} {joiner.last_name}</p>
                   <p className="text-caption text-muted">{joiner.department}</p>
                 </div>
-                <span className="text-caption text-muted">{joiner.joined}</span>
+                <span className="text-caption text-muted">{joiner.date_of_joining ? new Date(joiner.date_of_joining).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : ''}</span>
               </div>
             ))}
           </div>

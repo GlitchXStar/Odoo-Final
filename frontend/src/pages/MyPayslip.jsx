@@ -1,33 +1,75 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Download, Eye, ChevronLeft, ChevronRight, Calendar, DollarSign
 } from 'lucide-react';
-
-const myPayslips = [
-  { id: 'PS-2026-04-002', month: 'April 2026', gross: 72000, deductions: 9200, net: 62800, paidOn: '2026-04-28' },
-  { id: 'PS-2026-03-002', month: 'March 2026', gross: 72000, deductions: 9200, net: 62800, paidOn: '2026-03-28' },
-  { id: 'PS-2026-02-002', month: 'February 2026', gross: 72000, deductions: 9200, net: 62800, paidOn: '2026-02-27' },
-  { id: 'PS-2026-01-002', month: 'January 2026', gross: 72000, deductions: 9200, net: 62800, paidOn: '2026-01-29' },
-  { id: 'PS-2025-12-002', month: 'December 2025', gross: 68000, deductions: 8600, net: 59400, paidOn: '2025-12-28' },
-  { id: 'PS-2025-11-002', month: 'November 2025', gross: 68000, deductions: 8600, net: 59400, paidOn: '2025-11-28' },
-];
-
-const currentSalary = {
-  basic: 42000,
-  hra: 16800,
-  da: 4200,
-  conveyance: 1600,
-  medical: 1250,
-  special: 6150,
-  gross: 72000,
-  pf: 5040,
-  tax: 3960,
-  pt: 200,
-  totalDeductions: 9200,
-  net: 62800,
-};
+import { payroll, salaryStructures } from '../services/api.js';
 
 export default function MyPayslip() {
+  const [myPayslips, setMyPayslips] = useState([]);
+  const [currentSalary, setCurrentSalary] = useState({
+    basic: 0, hra: 0, da: 0, conveyance: 0, medical: 0, special: 0,
+    gross: 0, pf: 0, tax: 0, pt: 0, totalDeductions: 0, net: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchMyPayslips();
+  }, []);
+
+  const fetchMyPayslips = async () => {
+    try {
+      setLoading(true);
+      const [payrollRes, salaryRes] = await Promise.all([
+        payroll.getAll(),
+        salaryStructures.getAll()
+      ]);
+      setMyPayslips(payrollRes.data || []);
+      
+      // Get active salary structure
+      const activeSalary = salaryRes.data?.find(s => s.is_active) || {};
+      if (activeSalary) {
+        setCurrentSalary({
+          basic: activeSalary.basic || 0,
+          hra: activeSalary.hra || 0,
+          da: activeSalary.da || 0,
+          conveyance: activeSalary.conveyance || 0,
+          medical: activeSalary.medical || 0,
+          special: activeSalary.special || 0,
+          gross: activeSalary.gross || 0,
+          pf: activeSalary.pf || 0,
+          tax: activeSalary.tax || 0,
+          pt: activeSalary.professional_tax || 0,
+          totalDeductions: (activeSalary.pf || 0) + (activeSalary.tax || 0) + (activeSalary.professional_tax || 0),
+          net: activeSalary.net || 0,
+        });
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to load payslips');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Header */}

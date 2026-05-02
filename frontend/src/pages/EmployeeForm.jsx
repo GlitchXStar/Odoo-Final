@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Save, ChevronDown, User, Building2,
   Mail, Phone, MapPin, CreditCard, Calendar
 } from 'lucide-react';
+import { employees, users } from '../services/api.js';
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 const designations = [
@@ -14,9 +15,12 @@ const designations = [
 ];
 
 // For edit mode, this would be pre-filled from API
+const employmentTypes = ['Full-Time', 'Part-Time', 'Contract', 'Intern'];
+
 const emptyForm = {
   firstName: '', lastName: '', email: '', phone: '',
-  department: '', designation: '', reportingTo: '',
+  employmentType: 'Full-Time',
+  department: '', designation: '', managerId: '',
   joinDate: '', gender: '', dob: '', maritalStatus: '',
   bloodGroup: '', address: '', city: '', state: '', pincode: '',
   emergencyName: '', emergencyPhone: '', emergencyRelation: '',
@@ -74,20 +78,130 @@ export default function EmployeeForm() {
   const navigate = useNavigate();
   const isEdit = !!id;
 
-  const [form, setForm] = useState(isEdit ? existingEmployee : emptyForm);
+  const [form, setForm] = useState(emptyForm);
+  const [userId, setUserId] = useState(null);
+  const [managerList, setManagerList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchManagers();
+    if (isEdit && id) fetchEmployee(id);
+  }, [isEdit, id]);
+
+  const fetchManagers = async () => {
+    try {
+      const res = await employees.getAll();
+      const list = res?.data?.employees ?? res?.data ?? res;
+      setManagerList(Array.isArray(list) ? list : []);
+    } catch { setManagerList([]); }
+  };
+
+  const fetchEmployee = async (employeeId) => {
+    try {
+      setIsLoading(true);
+      const response = await employees.getById(employeeId);
+      const d = response?.data || {};
+      setUserId(d.user_id || null);
+      setForm({
+        firstName: d.first_name ?? '',
+        lastName: d.last_name ?? '',
+        email: d.email ?? '',
+        phone: d.phone ?? '',
+        department: d.department ?? '',
+        designation: d.designation ?? '',
+        managerId: d.manager_id ? String(d.manager_id) : '',
+        joinDate: d.date_of_joining ? d.date_of_joining.slice(0, 10) : '',
+        gender: d.gender ?? '',
+        dob: d.date_of_birth ? d.date_of_birth.slice(0, 10) : '',
+        maritalStatus: d.marital_status ?? '',
+        bloodGroup: d.blood_group ?? '',
+        address: d.permanent_address ?? '',
+        city: '',
+        state: '',
+        pincode: '',
+        emergencyName: d.emergency_contact_name ?? '',
+        emergencyPhone: d.emergency_contact_phone ?? '',
+        emergencyRelation: d.emergency_contact_relation ?? '',
+        bankName: d.bank_name ?? '',
+        accountNumber: d.bank_account_number ?? '',
+        ifsc: d.bank_ifsc ?? '',
+        panNumber: d.pan_number ?? '',
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to load employee');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const update = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
-  const handleSubmit = (e) => {
+  const toUserPayload = (f) => ({
+    firstName: f.firstName || undefined,
+    lastName: f.lastName || undefined,
+    email: f.email || undefined,
+    phone: f.phone || undefined,
+  });
+
+  const toApiPayload = (f) => ({
+    department: f.department || undefined,
+    designation: f.designation || undefined,
+    managerId: f.managerId ? Number(f.managerId) : undefined,
+    gender: f.gender || undefined,
+    maritalStatus: f.maritalStatus || undefined,
+    bloodGroup: f.bloodGroup || undefined,
+    dateOfBirth: f.dob || undefined,
+    emergencyContactName: f.emergencyName || undefined,
+    emergencyContactPhone: f.emergencyPhone || undefined,
+    permanentAddress: f.address ? [f.address, f.city, f.state, f.pincode].filter(Boolean).join(', ') : undefined,
+    panNumber: f.panNumber || undefined,
+    bankAccountNumber: f.accountNumber || undefined,
+    bankName: f.bankName || undefined,
+    bankIfsc: f.ifsc || undefined,
+  });
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Connect to backend API
-    setTimeout(() => {
-      setIsLoading(false);
+    setError('');
+    try {
+      if (isEdit) {
+        await employees.update(id, toApiPayload(form));
+        if (userId) await users.update(userId, toUserPayload(form));
+      } else {
+        if (!form.email) throw new Error('Email is required.');
+        if (!form.joinDate) throw new Error('Join date is required.');
+        await employees.createWithUser({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone || undefined,
+          roleId: 4,
+          dateOfJoining: form.joinDate,
+          employmentType: form.employmentType,
+          department: form.department || undefined,
+          designation: form.designation || undefined,
+          managerId: form.managerId ? Number(form.managerId) : undefined,
+          gender: form.gender || undefined,
+          maritalStatus: form.maritalStatus || undefined,
+          bloodGroup: form.bloodGroup || undefined,
+          dateOfBirth: form.dob || undefined,
+          emergencyContactName: form.emergencyName || undefined,
+          emergencyContactPhone: form.emergencyPhone || undefined,
+          permanentAddress: form.address ? [form.address, form.city, form.state, form.pincode].filter(Boolean).join(', ') : undefined,
+          panNumber: form.panNumber || undefined,
+          bankAccountNumber: form.accountNumber || undefined,
+          bankName: form.bankName || undefined,
+          bankIfsc: form.ifsc || undefined,
+        });
+      }
       navigate('/app/employees');
-    }, 1500);
+    } catch (err) {
+      setError(err.message || 'Failed to save employee');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -100,6 +214,12 @@ export default function EmployeeForm() {
         <ArrowLeft size={16} />
         Back to directory
       </Link>
+
+      {error && (
+        <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -140,6 +260,20 @@ export default function EmployeeForm() {
 
           {/* Work Info */}
           <FormSection title="Work Information" icon={Building2}>
+            <FormField label="Employment Type" id="employmentType" required>
+              <div className="relative">
+                <select
+                  id="employmentType"
+                  value={form.employmentType}
+                  onChange={update('employmentType')}
+                  className="input-field appearance-none pr-10 cursor-pointer"
+                  required
+                >
+                  {employmentTypes.map((t) => <option key={t}>{t}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+              </div>
+            </FormField>
             <FormField label="Department" id="department" required>
               <div className="relative">
                 <select
@@ -170,10 +304,27 @@ export default function EmployeeForm() {
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
               </div>
             </FormField>
-            <FormField
-              label="Reporting To" id="reportingTo" placeholder="Manager name"
-              value={form.reportingTo} onChange={update('reportingTo')}
-            />
+            <FormField label="Reporting To" id="managerId">
+              <div className="relative">
+                <select
+                  id="managerId"
+                  value={form.managerId}
+                  onChange={update('managerId')}
+                  className="input-field appearance-none pr-10 cursor-pointer"
+                >
+                  <option value="">— None —</option>
+                  {managerList
+                    .filter((m) => !isEdit || m.user_id !== userId)
+                    .map((m) => (
+                      <option key={m.user_id} value={m.user_id}>
+                        {m.first_name} {m.last_name}
+                        {m.designation ? ` · ${m.designation}` : ''}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+              </div>
+            </FormField>
             <FormField
               label="Join Date" id="joinDate" type="date"
               value={form.joinDate} onChange={update('joinDate')} required

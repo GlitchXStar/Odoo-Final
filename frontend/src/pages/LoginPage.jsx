@@ -1,18 +1,69 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { auth } from '../services/api.js';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const navigate = useNavigate();
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [loginMode, setLoginMode] = useState('password');
+  const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Connect to backend API
-    setTimeout(() => setIsLoading(false), 1500);
+    setError('');
+    setMessage('');
+    try {
+      const response = await auth.login({ identifier, password });
+      const authData = response.data || response;
+      localStorage.setItem('token', authData.token);
+      localStorage.setItem('user', JSON.stringify(authData.user));
+      navigate('/app/dashboard');
+    } catch (err) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRequestOtp = async () => {
+    setIsLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await auth.requestOtp({ identifier });
+      setOtpSent(true);
+      setMessage(response.message || 'OTP sent to your registered email.');
+    } catch (err) {
+      setError(err.message || 'Failed to send OTP');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await auth.verifyOtp({ identifier, otp });
+      const authData = response.data || response;
+      localStorage.setItem('token', authData.token);
+      localStorage.setItem('user', JSON.stringify(authData.user));
+      navigate('/app/dashboard');
+    } catch (err) {
+      setError(err.message || 'OTP verification failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,52 +112,121 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            {/* Email */}
+          {error && (
+            <div className="mb-4 p-3 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="mb-4 p-3 bg-success/10 border border-success/20 rounded-lg text-body-sm text-success">
+              {message}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 mb-5 p-1 bg-surface-card rounded-lg">
+            <button
+              type="button"
+              onClick={() => setLoginMode('password')}
+              className={`px-3 py-2 rounded-md text-caption font-medium transition-all ${
+                loginMode === 'password' ? 'bg-canvas text-ink shadow-soft' : 'text-muted hover:text-ink'
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMode('otp')}
+              className={`px-3 py-2 rounded-md text-caption font-medium transition-all ${
+                loginMode === 'otp' ? 'bg-canvas text-ink shadow-soft' : 'text-muted hover:text-ink'
+              }`}
+            >
+              OTP
+            </button>
+          </div>
+
+          <form onSubmit={loginMode === 'password' ? handleSubmit : handleOtpSubmit} className="flex flex-col gap-5">
+            {/* Email or Login ID */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="login-email" className="text-caption text-ink">
-                Email address
+                Email or Login ID
               </label>
               <input
                 id="login-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="you@company.com or EMP20260001"
                 className="input-field"
                 required
               />
             </div>
 
-            {/* Password */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="login-password" className="text-caption text-ink">
-                  Password
-                </label>
-                <a href="#" className="text-caption text-muted hover:text-ink transition-colors">
-                  Forgot password?
-                </a>
+            {loginMode === 'password' ? (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="login-password" className="text-caption text-ink">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginMode('otp');
+                      setError('');
+                      setMessage('');
+                    }}
+                    className="text-caption text-muted hover:text-ink transition-colors"
+                  >
+                    Use OTP instead
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="input-field pr-10"
+                    required={loginMode === 'password'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
-              <div className="relative">
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="login-otp" className="text-caption text-ink">
+                    One-time password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRequestOtp}
+                    disabled={isLoading || !identifier}
+                    className="text-caption text-muted hover:text-ink transition-colors disabled:opacity-50"
+                  >
+                    {otpSent ? 'Resend OTP' : 'Send OTP'}
+                  </button>
+                </div>
                 <input
-                  id="login-password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="input-field pr-10"
-                  required
+                  id="login-otp"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 6-digit OTP"
+                  className="input-field"
+                  required={loginMode === 'otp'}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
               </div>
-            </div>
+            )}
 
             {/* Submit */}
             <button
@@ -118,7 +238,7 @@ export default function LoginPage() {
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  Sign in
+                  {loginMode === 'password' ? 'Sign in' : 'Verify OTP'}
                   <ArrowRight size={16} />
                 </>
               )}

@@ -140,3 +140,18 @@
     font-family: 'Cal Sans', 'Inter', sans-serif;
   }
 }
+
+@media print {
+  .no-print { display: none !important; }
+
+  @page {
+    size: A4;
+    margin: 12mm 15mm;
+  }
+
+  /* Ensure colors print */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Ensure borders print */
+  .border-ink { border-color: #1a1a1a !important; }
+}

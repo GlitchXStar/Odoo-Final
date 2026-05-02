@@ -1,36 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  DollarSign, TrendingUp, Users, ArrowRight,
-  Clock, CheckCircle, AlertCircle, Play,
-  ChevronDown, Calendar
+  TrendingUp, Users, ArrowRight,
+  CheckCircle, AlertCircle, Play,
 } from 'lucide-react';
-
-const payrollStats = [
-  { label: 'Gross Salary', value: '₹52.3L', change: '+3.8%', icon: DollarSign },
-  { label: 'Total Deductions', value: '₹9.8L', change: '+1.2%', icon: TrendingUp },
-  { label: 'Net Disbursed', value: '₹42.5L', change: '+4.2%', icon: DollarSign },
-  { label: 'Employees Processed', value: '1,230', change: '98.5%', icon: Users },
-];
-
-const processingHistory = [
-  { month: 'May 2026', status: 'pending', processed: 0, total: 1248, runDate: null },
-  { month: 'Apr 2026', status: 'completed', processed: 1230, total: 1230, runDate: '2026-04-28' },
-  { month: 'Mar 2026', status: 'completed', processed: 1215, total: 1215, runDate: '2026-03-28' },
-  { month: 'Feb 2026', status: 'completed', processed: 1200, total: 1200, runDate: '2026-02-27' },
-  { month: 'Jan 2026', status: 'completed', processed: 1185, total: 1185, runDate: '2026-01-29' },
-  { month: 'Dec 2025', status: 'completed', processed: 1180, total: 1180, runDate: '2025-12-28' },
-];
-
-const salaryDistribution = [
-  { range: '< ₹25K', count: 180, percentage: 15 },
-  { range: '₹25K – ₹50K', count: 420, percentage: 34 },
-  { range: '₹50K – ₹75K', count: 350, percentage: 28 },
-  { range: '₹75K – ₹1L', count: 198, percentage: 16 },
-  { range: '> ₹1L', count: 100, percentage: 8 },
-];
+import { payroll, salaryStructures } from '../services/api.js';
 
 export default function PayrollOverview() {
+  const [payrollData, setPayrollData] = useState([]);
+  const [salaryData, setSalaryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchPayrollData();
+  }, []);
+
+  const fetchPayrollData = async () => {
+    try {
+      setLoading(true);
+      const payrollRes = await payroll.getAll();
+      const payRaw = payrollRes?.data ?? payrollRes;
+      setPayrollData(Array.isArray(payRaw) ? payRaw : []);
+      try {
+        const salRes = await salaryStructures.getAll();
+        const salRaw = salRes?.data ?? salRes;
+        setSalaryData(Array.isArray(salRaw) ? salRaw : []);
+      } catch { setSalaryData([]); }
+    } catch (err) {
+      setError(err.message || 'Failed to load payroll data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Group payroll records by month label
+  const historyMap = {};
+  payrollData.forEach((r) => {
+    const key = r.month && r.year ? `${new Date(0, r.month - 1).toLocaleString('en-IN', { month: 'long' })} ${r.year}` : 'Unknown';
+    if (!historyMap[key]) historyMap[key] = { key, count: 0, status: r.status, runDate: r.processed_at || r.created_at };
+    historyMap[key].count++;
+  });
+  const processingHistory = Object.values(historyMap);
+
+  // Salary distribution from salary_structure (active records)
+  const distSource = salaryData.length > 0 ? salaryData : payrollData;
+  const buckets = [{ range: '< ₹30K', min: 0, max: 30000 }, { range: '₹30K–₹50K', min: 30000, max: 50000 }, { range: '₹50K–₹80K', min: 50000, max: 80000 }, { range: '> ₹80K', min: 80000, max: Infinity }];
+  const maxCount = Math.max(1, ...buckets.map((b) => distSource.filter((r) => Number(r.gross_salary) >= b.min && Number(r.gross_salary) < b.max).length));
+  const salaryDistribution = buckets.map((b) => {
+    const count = distSource.filter((r) => Number(r.gross_salary) >= b.min && Number(r.gross_salary) < b.max).length;
+    return { range: b.range, count, percentage: Math.round((count / maxCount) * 100) };
+  });
+
+  // Calculate totals from actual payroll records
+  const totalGross = payrollData.reduce((s, r) => s + Number(r.gross_salary || 0), 0);
+  const totalDeductions = payrollData.reduce((s, r) => s + Number(r.total_deductions || 0), 0);
+  const totalNet = payrollData.reduce((s, r) => s + Number(r.net_salary || 0), 0);
+  const totalProcessed = new Set(payrollData.map((r) => r.user_id)).size;
+
+  const fmt = (n) => n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${n.toLocaleString('en-IN')}`;
+
+  const payrollStats = [
+    { label: 'Gross Salary', value: fmt(totalGross), symbol: '₹' },
+    { label: 'Total Deductions', value: fmt(totalDeductions), symbol: '₹' },
+    { label: 'Net Disbursed', value: fmt(totalNet), symbol: '₹' },
+    { label: 'Employees Processed', value: totalProcessed, icon: Users },
+  ];
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Header */}
@@ -54,15 +108,10 @@ export default function PayrollOverview() {
             <div className="flex items-center justify-between mb-3">
               <span className="text-caption text-muted">{stat.label}</span>
               <div className="w-9 h-9 rounded-lg bg-surface-card flex items-center justify-center">
-                <stat.icon size={18} className="text-muted" />
+                {stat.icon ? <stat.icon size={18} className="text-muted" /> : <span className="text-title-sm text-muted font-medium">{stat.symbol}</span>}
               </div>
             </div>
             <p className="text-title-lg text-ink">{stat.value}</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <TrendingUp size={14} className="text-success" />
-              <span className="text-caption text-success">{stat.change}</span>
-              <span className="text-caption text-muted">vs last month</span>
-            </div>
           </div>
         ))}
       </div>
@@ -78,32 +127,27 @@ export default function PayrollOverview() {
             </Link>
           </div>
           <div className="divide-y divide-hairline">
-            {processingHistory.map((run) => (
-              <div key={run.month} className="px-5 py-4 flex items-center justify-between">
+            {processingHistory.length === 0 ? (
+              <p className="px-5 py-8 text-body-sm text-muted text-center">No payroll records yet.</p>
+            ) : processingHistory.map((run) => (
+              <div key={run.key} className="px-5 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {run.status === 'completed' ? (
+                  {['Processed','Approved','Paid'].includes(run.status) ? (
                     <CheckCircle size={16} className="text-success" />
                   ) : (
                     <AlertCircle size={16} className="text-warning" />
                   )}
                   <div>
-                    <p className="text-body-sm font-medium text-ink">{run.month}</p>
+                    <p className="text-body-sm font-medium text-ink">{run.key}</p>
                     <p className="text-caption text-muted">
-                      {run.status === 'completed'
-                        ? `${run.processed} employees · Run on ${new Date(run.runDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
-                        : 'Not yet processed'}
+                      {run.count} employee{run.count !== 1 ? 's' : ''}{run.runDate ? ` · Run on ${new Date(run.runDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`badge ${run.status === 'completed' ? 'badge-approved' : 'badge-pending'}`}>
-                    {run.status === 'completed' ? 'Completed' : 'Pending'}
+                  <span className={`badge ${['Processed','Approved','Paid'].includes(run.status) ? 'badge-approved' : 'badge-pending'}`}>
+                    {run.status || 'Pending'}
                   </span>
-                  {run.status === 'pending' && (
-                    <Link to="/app/payroll/process" className="px-3 py-1.5 text-caption font-medium bg-ink text-on-primary rounded-md hover:bg-[#242424] transition-colors">
-                      Process
-                    </Link>
-                  )}
                 </div>
               </div>
             ))}

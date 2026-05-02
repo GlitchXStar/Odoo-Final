@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Building2, Bell, Shield, Globe, ChevronDown, Save,
   Mail, Phone, MapPin, Clock, Users, CreditCard,
   Palette, Lock, Upload
 } from 'lucide-react';
+import { company } from '../services/api.js';
 
 const settingsTabs = [
   { key: 'company', label: 'Company', icon: Building2 },
@@ -46,10 +47,35 @@ function Toggle({ label, description, defaultChecked = false }) {
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('company');
   const [isLoading, setIsLoading] = useState(false);
+  const [companyData, setCompanyData] = useState({});
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const handleSave = () => {
+  useEffect(() => {
+    fetchCompany();
+  }, []);
+
+  const fetchCompany = async () => {
+    try {
+      const response = await company.getMe();
+      setCompanyData(response.data || {});
+    } catch (err) {
+      setError(err.message || 'Failed to load company settings');
+    }
+  };
+
+  const handleSave = async () => {
     setIsLoading(true);
-    setTimeout(() => setIsLoading(false), 1500);
+    setError('');
+    setSuccess('');
+    try {
+      await company.update(companyData);
+      setSuccess('Settings saved successfully');
+    } catch (err) {
+      setError(err.message || 'Failed to save settings');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

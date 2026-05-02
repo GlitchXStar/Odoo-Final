@@ -1,4 +1,6 @@
 const employeeService = require('../services/employee.service');
+const { sendCredentialsEmail } = require('../services/email.service');
+const auditService = require('../services/audit.service');
 
 const getAllEmployees = async (req, res, next) => {
   try {
@@ -55,4 +57,30 @@ const updateEmployee = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllEmployees, getEmployeeById, getMyProfile, createEmployee, updateEmployee };
+const createEmployeeWithUser = async (req, res, next) => {
+  try {
+    const result = await employeeService.createEmployeeWithUser(req.companyId, req.body);
+    sendCredentialsEmail(result.user.email, {
+      firstName: result.user.first_name,
+      loginId: result.loginId,
+      temporaryPassword: result.generatedPassword,
+      companyName: result.user.company_name || '',
+    }).catch((e) => console.error('Credentials email failed:', e.message));
+    await auditService.logAction({
+      userId: req.user.id, companyId: req.companyId,
+      action: 'EMPLOYEE_CREATED', entityType: 'employee_profiles',
+      entityId: result.employee.id,
+      newValues: { email: result.user.email, loginId: result.loginId },
+      ipAddress: req.ip, userAgent: req.get('user-agent'),
+    }).catch(() => {});
+    res.status(201).json({
+      success: true,
+      message: 'Employee created. Credentials emailed to the user.',
+      data: { employee: result.employee, user: result.user, loginId: result.loginId },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getAllEmployees, getEmployeeById, getMyProfile, createEmployee, updateEmployee, createEmployeeWithUser };

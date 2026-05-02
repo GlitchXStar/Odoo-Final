@@ -132,7 +132,7 @@ const checkOut = async (userId, companyId) => {
 
 const getAttendance = async (companyId, { userId, date, month, year, page = 1, limit = 50 }) => {
   const offset = (page - 1) * limit;
-  let sql = 'SELECT a.*, u.first_name, u.last_name, u.email FROM attendance a INNER JOIN users u ON a.user_id = u.id WHERE a.company_id = $1';
+  let sql = 'SELECT a.*, u.first_name, u.last_name, u.email, ep.department FROM attendance a INNER JOIN users u ON a.user_id = u.id LEFT JOIN employee_profiles ep ON u.id = ep.user_id WHERE a.company_id = $1';
   const params = [companyId];
   let idx = 2;
 
@@ -168,4 +168,24 @@ function parseTimeToMinutes(timeStr) {
   return parseInt(parts[0]) * 60 + parseInt(parts[1]);
 }
 
-module.exports = { checkIn, checkOut, getAttendance };
+const updateAttendance = async (id, companyId, { status, remarks }) => {
+  const validStatuses = Object.values(ATTENDANCE_STATUS);
+  if (!validStatuses.includes(status)) {
+    throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
+  }
+
+  const existing = await query(
+    'SELECT id FROM attendance WHERE id = $1 AND company_id = $2',
+    [id, companyId]
+  );
+  if (existing.rows.length === 0) throw new AppError('Attendance record not found.', 404);
+
+  const result = await query(
+    `UPDATE attendance SET status = $1, remarks = COALESCE($2, remarks), updated_at = NOW()
+     WHERE id = $3 AND company_id = $4 RETURNING *`,
+    [status, remarks || null, id, companyId]
+  );
+  return result.rows[0];
+};
+
+module.exports = { checkIn, checkOut, getAttendance, updateAttendance };

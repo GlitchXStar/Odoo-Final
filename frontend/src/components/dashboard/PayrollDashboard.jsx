@@ -1,36 +1,79 @@
+import { useState, useEffect } from 'react';
 import {
   DollarSign, TrendingUp, TrendingDown, Users,
   ArrowRight, Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
+import { dashboard, payroll } from '../../services/api.js';
 
-const payrollStats = [
-  { label: 'Gross Salary', value: '₹52.3L', change: '+3.8%', trend: 'up', icon: DollarSign },
-  { label: 'Total Deductions', value: '₹9.8L', change: '+1.2%', trend: 'up', icon: TrendingDown },
-  { label: 'Net Disbursed', value: '₹42.5L', change: '+4.2%', trend: 'up', icon: TrendingUp },
-  { label: 'Employees Processed', value: '1,230', change: '98.5%', trend: 'up', icon: Users },
-];
-
-const processingStatus = [
-  { month: 'May 2026', status: 'pending', processed: 0, total: 1248 },
-  { month: 'Apr 2026', status: 'completed', processed: 1230, total: 1230 },
-  { month: 'Mar 2026', status: 'completed', processed: 1215, total: 1215 },
-  { month: 'Feb 2026', status: 'completed', processed: 1200, total: 1200 },
-];
-
-const salaryDistribution = [
-  { range: '< ₹25K', count: 180, percentage: 15 },
-  { range: '₹25K - ₹50K', count: 420, percentage: 34 },
-  { range: '₹50K - ₹75K', count: 350, percentage: 28 },
-  { range: '₹75K - ₹1L', count: 198, percentage: 16 },
-  { range: '> ₹1L', count: 100, percentage: 8 },
-];
+const fmt = (val) => {
+  const n = parseFloat(val) || 0;
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
+  return `₹${n.toLocaleString('en-IN')}`;
+};
 
 const statusIcon = {
-  completed: <CheckCircle size={16} className="text-success" />,
-  pending: <AlertCircle size={16} className="text-warning" />,
+  Processed: <CheckCircle size={16} className="text-success" />,
+  Approved: <CheckCircle size={16} className="text-success" />,
+  Paid: <CheckCircle size={16} className="text-success" />,
+  Pending: <AlertCircle size={16} className="text-warning" />,
+  Draft: <AlertCircle size={16} className="text-warning" />,
 };
 
 export default function PayrollDashboard() {
+  const [stats, setStats] = useState(null);
+  const [payrollRuns, setPayrollRuns] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [statsRes, payRes] = await Promise.all([
+          dashboard.getStats(),
+          payroll.getAll(),
+        ]);
+        setStats(statsRes?.data || statsRes || {});
+        setPayrollRuns(Array.isArray(payRes?.data) ? payRes.data : Array.isArray(payRes) ? payRes : []);
+      } catch (e) {
+        console.error('Payroll dashboard error:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const pay = stats?.payrollSummary || {};
+  const emp = stats?.employees || {};
+
+  const grossTotal = payrollRuns.reduce((s, r) => s + parseFloat(r.gross_salary || 0), 0);
+  const deductTotal = payrollRuns.reduce((s, r) => s + parseFloat(r.total_deductions || 0), 0);
+  const netTotal = payrollRuns.reduce((s, r) => s + parseFloat(r.net_salary || 0), 0);
+
+  const payrollStats = [
+    { label: 'Gross Salary', value: grossTotal ? fmt(grossTotal) : '—', change: `${payrollRuns.length} records`, trend: 'up', icon: DollarSign },
+    { label: 'Total Deductions', value: deductTotal ? fmt(deductTotal) : '—', change: 'PF + Tax + PT', trend: 'up', icon: TrendingDown },
+    { label: 'Net Disbursed', value: netTotal ? fmt(netTotal) : '—', change: 'take-home total', trend: 'up', icon: TrendingUp },
+    { label: 'Employees Processed', value: pay.total_processed ?? payrollRuns.length, change: `of ${emp.total_employees ?? '—'}`, trend: 'up', icon: Users },
+  ];
+
+  // Group payroll runs by month/year
+  const grouped = payrollRuns.reduce((acc, r) => {
+    const key = `${r.month_name || r.month} ${r.year}`;
+    if (!acc[key]) acc[key] = { key, status: r.status, count: 0 };
+    acc[key].count++;
+    return acc;
+  }, {});
+  const processingStatus = Object.values(grouped).slice(0, 5);
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Header */}
@@ -79,52 +122,44 @@ export default function PayrollDashboard() {
             </a>
           </div>
           <div className="divide-y divide-hairline">
-            {processingStatus.map((run) => (
-              <div key={run.month} className="px-5 py-4 flex items-center justify-between">
+            {processingStatus.length === 0 ? (
+              <p className="px-5 py-8 text-body-sm text-muted text-center">No payroll records yet.</p>
+            ) : processingStatus.map((run) => (
+              <div key={run.key} className="px-5 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {statusIcon[run.status]}
+                  {statusIcon[run.status] || <AlertCircle size={16} className="text-muted" />}
                   <div>
-                    <p className="text-body-sm font-medium text-ink">{run.month}</p>
+                    <p className="text-body-sm font-medium text-ink">{run.key}</p>
                     <p className="text-caption text-muted">
-                      {run.status === 'completed'
-                        ? `${run.processed} employees processed`
-                        : 'Not yet processed'}
+                      {run.count} employee{run.count !== 1 ? 's' : ''} processed
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`badge badge-${run.status === 'completed' ? 'approved' : 'pending'}`}>
-                    {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
+                  <span className={`badge badge-${['Processed','Approved','Paid'].includes(run.status) ? 'approved' : 'pending'}`}>
+                    {run.status}
                   </span>
-                  {run.status === 'pending' && (
-                    <a href="/app/payroll/process" className="px-3 py-1.5 text-caption font-medium bg-ink text-on-primary rounded-md hover:bg-[#242424] transition-colors">
-                      Process
-                    </a>
-                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Salary Distribution */}
+        {/* Payroll Summary */}
         <div className="lg:col-span-2 bg-canvas border border-hairline rounded-lg">
           <div className="px-5 py-4 border-b border-hairline">
-            <h3 className="text-title-sm text-ink">Salary Distribution</h3>
+            <h3 className="text-title-sm text-ink">This Year Summary</h3>
           </div>
           <div className="p-5 space-y-4">
-            {salaryDistribution.map((range) => (
-              <div key={range.range}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-body-sm text-ink">{range.range}</span>
-                  <span className="text-caption text-muted">{range.count}</span>
-                </div>
-                <div className="w-full h-2 bg-surface-card rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-ink rounded-full transition-all duration-500"
-                    style={{ width: `${range.percentage}%` }}
-                  />
-                </div>
+            {[
+              { label: 'Total Gross', value: fmt(grossTotal) },
+              { label: 'Total Deductions', value: fmt(deductTotal) },
+              { label: 'Total Net Pay', value: fmt(netTotal) },
+              { label: 'Payroll Runs', value: payrollRuns.length },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between py-1 border-b border-hairline last:border-0">
+                <span className="text-body-sm text-muted">{item.label}</span>
+                <span className="text-body-sm font-medium text-ink">{item.value}</span>
               </div>
             ))}
           </div>

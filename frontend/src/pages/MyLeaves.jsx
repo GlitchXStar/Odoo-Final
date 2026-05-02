@@ -1,28 +1,59 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarOff, Plus, ArrowRight, Calendar
 } from 'lucide-react';
-
-const leaveBalance = [
-  { type: 'Casual Leave', total: 12, used: 6, remaining: 6 },
-  { type: 'Sick Leave', total: 8, used: 4, remaining: 4 },
-  { type: 'Paid Leave', total: 15, used: 7, remaining: 8 },
-  { type: 'Unpaid Leave', total: '—', used: 0, remaining: '—' },
-];
-
-const myLeaves = [
-  { id: 1, type: 'Casual Leave', from: '2026-05-05', to: '2026-05-06', days: 2, status: 'pending', reason: 'Family function in hometown.' },
-  { id: 2, type: 'Casual Leave', from: '2026-04-15', to: '2026-04-16', days: 2, status: 'approved', reason: 'Personal work.' },
-  { id: 3, type: 'Sick Leave', from: '2026-03-22', to: '2026-03-22', days: 1, status: 'approved', reason: 'Fever and headache.' },
-  { id: 4, type: 'Casual Leave', from: '2026-02-10', to: '2026-02-12', days: 3, status: 'approved', reason: 'Short vacation.' },
-  { id: 5, type: 'Paid Leave', from: '2026-01-20', to: '2026-01-24', days: 5, status: 'approved', reason: 'Wedding in family.' },
-  { id: 6, type: 'Sick Leave', from: '2025-12-15', to: '2025-12-15', days: 1, status: 'rejected', reason: 'Feeling unwell.' },
-];
+import { leaves, leaveBalances } from '../services/api.js';
 
 const statusBadge = { pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected' };
 const statusLabel = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
 
 export default function MyLeaves() {
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [leaveBalance, setLeaveBalance] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchMyLeaves();
+  }, []);
+
+  const fetchMyLeaves = async () => {
+    try {
+      setLoading(true);
+      const [leavesRes, balancesRes] = await Promise.all([
+        leaves.getAll(),
+        leaveBalances.getAll()
+      ]);
+      const leavesRaw = leavesRes?.data?.leaves ?? leavesRes?.data ?? leavesRes;
+      setMyLeaves(Array.isArray(leavesRaw) ? leavesRaw : []);
+      const balRaw = balancesRes?.data ?? balancesRes;
+      setLeaveBalance(Array.isArray(balRaw) ? balRaw : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load leave data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-content mx-auto flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-content mx-auto">
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-body-sm text-error">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-content mx-auto">
       {/* Header */}
@@ -42,24 +73,22 @@ export default function MyLeaves() {
       {/* Leave Balance */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {leaveBalance.map((bal) => (
-          <div key={bal.type} className="bg-canvas border border-hairline rounded-lg p-5">
-            <p className="text-caption text-muted mb-3">{bal.type}</p>
+          <div key={bal.leave_type_name} className="bg-canvas border border-hairline rounded-lg p-5">
+            <p className="text-caption text-muted mb-3">{bal.leave_type_name}</p>
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-title-lg text-ink">{bal.remaining}</p>
+                <p className="text-title-lg text-ink">{bal.balance}</p>
                 <p className="text-caption text-muted">remaining</p>
               </div>
-              {typeof bal.total === 'number' && (
-                <div className="text-right">
-                  <p className="text-caption text-muted">{bal.used} used / {bal.total} total</p>
-                  <div className="w-20 h-1.5 bg-surface-card rounded-full mt-1.5 overflow-hidden">
-                    <div
-                      className="h-full bg-ink rounded-full"
-                      style={{ width: `${(bal.used / bal.total) * 100}%` }}
-                    />
-                  </div>
+              <div className="text-right">
+                <p className="text-caption text-muted">{bal.used} used / {bal.allocated} total</p>
+                <div className="w-20 h-1.5 bg-surface-card rounded-full mt-1.5 overflow-hidden">
+                  <div
+                    className="h-full bg-ink rounded-full"
+                    style={{ width: `${bal.allocated > 0 ? (bal.used / bal.allocated) * 100 : 0}%` }}
+                  />
                 </div>
-              )}
+              </div>
             </div>
           </div>
         ))}

@@ -46,7 +46,7 @@ export default function AppLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-[260px] bg-canvas border-r border-hairline flex flex-col transition-transform duration-200 lg:translate-x-0 ${
+        className={`print:hidden fixed lg:sticky top-0 left-0 z-50 h-screen w-[260px] bg-canvas border-r border-hairline flex flex-col transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -111,7 +111,7 @@ export default function AppLayout() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Top Bar */}
-        <header className="h-16 bg-canvas border-b border-hairline flex items-center justify-between px-6 shrink-0 sticky top-0 z-30">
+        <header className="print:hidden h-16 bg-canvas border-b border-hairline flex items-center justify-between px-6 shrink-0 sticky top-0 z-30">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(true)}
