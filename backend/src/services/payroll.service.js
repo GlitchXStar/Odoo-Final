@@ -18,7 +18,7 @@ const runPayroll = async (companyId, { userId, month, year, generatedBy }) => {
     }
 
     // 1. Fetch salary structure
-    const salaryResult = await client.query(
+    let salaryResult = await client.query(
       `SELECT * FROM salary_structure
        WHERE user_id = $1 AND company_id = $2 AND is_active = true
          AND effective_from <= $3
@@ -26,6 +26,16 @@ const runPayroll = async (companyId, { userId, month, year, generatedBy }) => {
        ORDER BY effective_from DESC LIMIT 1`,
       [userId, companyId, `${year}-${String(month).padStart(2, '0')}-01`]
     );
+
+    // Fallback: find any active salary structure regardless of date range
+    if (salaryResult.rows.length === 0) {
+      salaryResult = await client.query(
+        `SELECT * FROM salary_structure
+         WHERE user_id = $1 AND company_id = $2 AND is_active = true
+         ORDER BY effective_from DESC LIMIT 1`,
+        [userId, companyId]
+      );
+    }
 
     if (salaryResult.rows.length === 0) {
       throw new AppError('No active salary structure found for this employee.', 404);
@@ -253,7 +263,8 @@ function calculateMonthlyIncomeTax(annualSalary) {
 const estimatePayroll = async (companyId, userId) => {
   const today = new Date().toISOString().slice(0, 10);
 
-  const salaryResult = await query(
+  // Try strict date-filtered lookup first
+  let salaryResult = await query(
     `SELECT * FROM salary_structure
      WHERE user_id = $1 AND company_id = $2 AND is_active = true
        AND effective_from <= $3
@@ -261,6 +272,16 @@ const estimatePayroll = async (companyId, userId) => {
      ORDER BY effective_from DESC LIMIT 1`,
     [userId, companyId, today]
   );
+
+  // Fallback: find any active salary structure regardless of date range
+  if (salaryResult.rows.length === 0) {
+    salaryResult = await query(
+      `SELECT * FROM salary_structure
+       WHERE user_id = $1 AND company_id = $2 AND is_active = true
+       ORDER BY effective_from DESC LIMIT 1`,
+      [userId, companyId]
+    );
+  }
 
   if (salaryResult.rows.length === 0) {
     throw new AppError('No active salary structure found for this employee.', 404);

@@ -30,7 +30,62 @@ const allocateBalance = async (companyId, data) => {
   return result.rows[0];
 };
 
+// Default leave types and their annual allocations
+const DEFAULT_LEAVE_TYPES = [
+  { name: 'Annual Leave',  code: 'AL', quota: 15, isPaid: true,  carryForward: true,  maxCarry: 5 },
+  { name: 'Paid Leave',    code: 'PL', quota: 5,  isPaid: true,  carryForward: false, maxCarry: 0 },
+  { name: 'Sick Leave',    code: 'SL', quota: 60, isPaid: true,  carryForward: false, maxCarry: 0 },
+  { name: 'Unpaid Leave',  code: 'UL', quota: 30, isPaid: false, carryForward: false, maxCarry: 0 },
+];
+
+const ensureBalanceAllocated = async (companyId, userId) => {
+  const currentYear = new Date().getFullYear();
+
+  // Check if this user already has any leave balance for the current year
+  const existing = await query(
+    'SELECT id FROM leave_balances WHERE user_id = $1 AND company_id = $2 AND year = $3 LIMIT 1',
+    [userId, companyId, currentYear]
+  );
+  if (existing.rows.length > 0) return;
+
+  // Deactivate Casual Leave if it exists
+  await query(
+    "UPDATE leave_types SET is_active = false WHERE company_id = $1 AND code = 'CL'",
+    [companyId]
+  );
+
+  // Find or create each leave type and allocate balance
+  for (const lt of DEFAULT_LEAVE_TYPES) {
+    let leaveType = await query(
+      'SELECT id FROM leave_types WHERE company_id = $1 AND code = $2 AND is_active = true LIMIT 1',
+      [companyId, lt.code]
+    );
+    if (leaveType.rows.length === 0) {
+      leaveType = await query(
+        `INSERT INTO leave_types (company_id, name, code, annual_quota, is_paid, carry_forward, max_carry_forward)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (company_id, code) DO UPDATE SET is_active = true, annual_quota = $4
+         RETURNING id`,
+        [companyId, lt.name, lt.code, lt.quota, lt.isPaid, lt.carryForward, lt.maxCarry]
+      );
+    }
+    const leaveTypeId = leaveType.rows[0].id;
+
+    await query(
+      `INSERT INTO leave_balances (user_id, company_id, leave_type_id, year, total_allocated, used, balance)
+       VALUES ($1, $2, $3, $4, $5, 0, $5)
+       ON CONFLICT (user_id, leave_type_id, year) DO NOTHING`,
+      [userId, companyId, leaveTypeId, currentYear, lt.quota]
+    );
+  }
+};
+
 const getBalances = async (companyId, { userId, year }) => {
+  // Auto-allocate default paid leaves for the requesting user if none exist
+  if (userId) {
+    await ensureBalanceAllocated(companyId, userId);
+  }
+
   let sql = `SELECT lb.*, lt.name AS leave_type_name, lt.code AS leave_type_code,
                     u.first_name, u.last_name
              FROM leave_balances lb

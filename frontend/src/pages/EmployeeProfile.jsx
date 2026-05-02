@@ -45,6 +45,11 @@ export default function EmployeeProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = (currentUser.role_name || currentUser.role || '').toLowerCase();
+  const isHR = userRole === 'hr officer';
+  const visibleTabs = isHR ? tabs.filter(t => t.key !== 'salary') : tabs;
   const [emp, setEmp] = useState(null);
   const [sal, setSal] = useState(null);
   const [latestPayroll, setLatestPayroll] = useState(null);
@@ -249,7 +254,7 @@ export default function EmployeeProfile() {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-6 p-1 bg-surface-card rounded-lg w-fit">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}

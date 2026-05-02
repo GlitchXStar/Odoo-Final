@@ -89,19 +89,29 @@ export default function RunPayroll() {
         sumDeduct += Number(estimateMap[emp.user_id]?.total_deductions) || 0;
       });
 
-      // Build per-employee detail rows
+      // Build per-employee detail rows (fall back to salMap when estimate is unavailable)
       const detail = employeeArr.map((emp) => {
         const est = estimateMap[emp.user_id] || {};
-        const hasSalary = !!est.gross_salary;
+        const sal = salMap[emp.user_id] || {};
+        const hasSalary = !!(est.gross_salary || sal.gross_salary);
+
+        // Use estimate data if available, otherwise derive from salary structure
+        const basic = Number(est.basic || sal.basic || 0);
+        const hra = Number(est.hra || sal.hra || 0);
+        const allowances = Number(est.allowances ||
+          ((Number(sal.conveyance_allowance) || 0) + (Number(sal.medical_allowance) || 0) +
+           (Number(sal.special_allowance) || 0) + (Number(sal.other_allowances) || 0)) || 0);
+        const gross = Number(est.gross_salary || sal.gross_salary || 0);
+
         return {
           name: `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
           department: emp.department || '—',
           designation: emp.designation || '—',
           hasSalary,
-          basic: Number(est.basic || 0),
-          hra: Number(est.hra || 0),
-          allowances: Number(est.allowances || 0),
-          gross: Number(est.gross_salary || 0),
+          basic,
+          hra,
+          allowances,
+          gross,
           pf: Number(est.pf_deduction || 0),
           esi: Number(est.esi_deduction || 0),
           pt: Number(est.professional_tax || 0),

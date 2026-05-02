@@ -15,6 +15,19 @@ const statusColors = {
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Format date as YYYY-MM-DD in local timezone (not UTC)
+const toLocalIso = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Normalize any date value (string or Date object) to YYYY-MM-DD in local timezone
+// pg serializes DATE columns as UTC midnight (e.g. "2026-05-02T18:30:00.000Z" for May 3 IST)
+// so we must always parse through Date() to get the correct local date
+const normalizeDate = (val) => {
+  if (!val) return '';
+  if (val instanceof Date) return toLocalIso(val);
+  return toLocalIso(new Date(val));
+};
+
 export default function EmployeeDashboard() {
   const now = new Date();
   const hours = now.getHours();
@@ -58,8 +71,8 @@ export default function EmployeeDashboard() {
 
   // Determine today's attendance record
   const today = new Date();
-  const todayIso = today.toISOString().split('T')[0];
-  const todayRecord = attendanceData.find(a => a.date?.startsWith(todayIso));
+  const todayIso = toLocalIso(today);
+  const todayRecord = attendanceData.find(a => normalizeDate(a.date) === todayIso);
   const isCheckedIn = !!todayRecord?.check_in && !todayRecord?.check_out;
   const isCheckedOut = !!todayRecord?.check_out;
 
@@ -69,7 +82,7 @@ export default function EmployeeDashboard() {
     try {
       const res = await attendance.checkIn();
       setAttendanceData(prev => {
-        const exists = prev.findIndex(a => a.date?.startsWith(todayIso));
+        const exists = prev.findIndex(a => normalizeDate(a.date) === todayIso);
         if (exists >= 0) { const n = [...prev]; n[exists] = res.data; return n; }
         return [res.data, ...prev];
       });
@@ -84,7 +97,7 @@ export default function EmployeeDashboard() {
     try {
       const res = await attendance.checkOut();
       setAttendanceData(prev => {
-        const exists = prev.findIndex(a => a.date?.startsWith(todayIso));
+        const exists = prev.findIndex(a => normalizeDate(a.date) === todayIso);
         if (exists >= 0) { const n = [...prev]; n[exists] = res.data; return n; }
         return prev;
       });
@@ -95,16 +108,19 @@ export default function EmployeeDashboard() {
 
   // Build this week's attendance (Mon–Sun)
   const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay() + 1);
+  const dow = today.getDay() || 7; // treat Sunday as 7 so Monday is always the start
+  startOfWeek.setDate(today.getDate() - dow + 1);
   const weekDays = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(startOfWeek);
     d.setDate(startOfWeek.getDate() + i);
     return d;
   });
   const attendanceWeek = weekDays.map((d) => {
-    const iso = d.toISOString().split('T')[0];
-    const rec = attendanceData.find(a => a.date?.startsWith(iso));
-    const st = rec?.status || (d > today ? null : 'Absent');
+    const iso = toLocalIso(d);
+    const rec = attendanceData.find(a => normalizeDate(a.date) === iso);
+    const isFuture = iso > todayIso;
+    // If record exists, use its status; if it has check_in treat as Present; otherwise Absent for past/today
+    const st = rec?.status || (rec?.check_in ? 'Present' : (isFuture ? null : 'Absent'));
     return {
       day: DAY_LABELS[d.getDay()],
       status: st,

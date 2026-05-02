@@ -429,10 +429,10 @@ export default function SettingsPage() {
               <div className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: 'Casual Leave / Year', value: '12', icon: Calendar },
-                    { label: 'Sick Leave / Year', value: '8', icon: FileText },
-                    { label: 'Paid Leave / Year', value: '15', icon: Briefcase },
-                    { label: 'Carry Forward Limit', value: '5', icon: Users },
+                    { label: 'Annual Leave / Year', value: '15', icon: Calendar },
+                    { label: 'Paid Leave / Year', value: '5', icon: Briefcase },
+                    { label: 'Sick Leave / Year', value: '60', icon: FileText },
+                    { label: 'Unpaid Leave / Year', value: '30', icon: Users },
                   ].map((item) => (
                     <div key={item.label} className="bg-surface-soft rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-2">

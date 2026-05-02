@@ -4,8 +4,14 @@ const { ATTENDANCE_STATUS } = require('../config/constants');
 const shiftService = require('./shift.service');
 const holidayService = require('./holiday.service');
 
+// Returns today's date as YYYY-MM-DD in local timezone (not UTC)
+function getLocalToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 const checkIn = async (userId, companyId) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
   const now = new Date();
 
   // Check for duplicate attendance
@@ -16,6 +22,18 @@ const checkIn = async (userId, companyId) => {
 
   if (existing.rows.length > 0 && existing.rows[0].check_in) {
     throw new AppError('Already checked in today.', 409);
+  }
+
+  // Block check-in if there's an unchecked-out record from a previous day
+  const pendingCheckout = await query(
+    `SELECT id, date FROM attendance
+     WHERE user_id = $1 AND company_id = $2 AND date < $3
+       AND check_in IS NOT NULL AND check_out IS NULL
+     ORDER BY date DESC LIMIT 1`,
+    [userId, companyId, today]
+  );
+  if (pendingCheckout.rows.length > 0) {
+    throw new AppError('You have a pending check-out from a previous session. Please check out first.', 400);
   }
 
   // Check if today is a holiday
@@ -76,16 +94,30 @@ const checkIn = async (userId, companyId) => {
 };
 
 const checkOut = async (userId, companyId) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
   const now = new Date();
 
-  const existing = await query(
+  // Look for today's record first
+  let existing = await query(
     'SELECT * FROM attendance WHERE user_id = $1 AND date = $2',
     [userId, today]
   );
 
+  // Cross-midnight fallback: if no record today (or no check-in), find the most recent
+  // unchecked-out record (e.g. checked in yesterday before midnight)
   if (existing.rows.length === 0 || !existing.rows[0].check_in) {
-    throw new AppError('No check-in found for today. Please check in first.', 400);
+    const fallback = await query(
+      `SELECT * FROM attendance
+       WHERE user_id = $1 AND company_id = $2
+         AND check_in IS NOT NULL AND check_out IS NULL
+       ORDER BY date DESC LIMIT 1`,
+      [userId, companyId]
+    );
+    if (fallback.rows.length > 0) {
+      existing = fallback;
+    } else {
+      throw new AppError('No check-in found for today. Please check in first.', 400);
+    }
   }
 
   if (existing.rows[0].check_out) {
