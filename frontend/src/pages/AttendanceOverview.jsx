@@ -21,8 +21,8 @@ const STATUSES = ['Present', 'Absent', 'Half-Day', 'Leave', 'Holiday', 'Week-Off
 
 export default function AttendanceOverview() {
   const { user } = useAuth();
-  const roleName = user?.role_name || user?.roleName || '';
-  const isHR = roleName === 'Admin' || roleName === 'HR Officer';
+  const roleName = (user?.role_name || user?.roleName || '').toLowerCase();
+  const isHR = roleName === 'admin' || roleName === 'hr officer' || roleName === 'payroll officer';
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -186,7 +186,7 @@ export default function AttendanceOverview() {
             <tbody className="divide-y divide-hairline">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-body-sm text-muted">No attendance records found.</td>
+                  <td colSpan={isHR ? 7 : 6} className="px-5 py-10 text-center text-body-sm text-muted">No attendance records found.</td>
                 </tr>
               ) : filtered.map((rec) => (
                 <tr key={rec.id} className="hover:bg-surface-soft/50 transition-colors">

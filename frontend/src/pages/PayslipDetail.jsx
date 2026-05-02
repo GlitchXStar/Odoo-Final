@@ -8,6 +8,10 @@ export default function PayslipDetail() {
   const [ps, setPayslip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = ['admin', 'payroll officer', 'hr officer'].includes((user.role_name || user.role || '').toLowerCase());
+  const backLink = isAdmin ? '/app/payroll/payslips' : '/app/payroll/my-payslip';
 
   useEffect(() => {
     if (payslipId) {
@@ -114,11 +118,11 @@ export default function PayslipDetail() {
       {/* Back + Actions — hidden on print */}
       <div className="no-print">
         <Link
-          to="/app/payroll/payslips"
+          to={backLink}
           className="inline-flex items-center gap-1.5 text-body-sm text-muted hover:text-ink transition-colors mb-6"
         >
           <ArrowLeft size={16} />
-          Back to payslips
+          {isAdmin ? 'Back to payslips' : 'Back to my payslip'}
         </Link>
 
         <div className="flex items-center justify-between mb-6">

@@ -16,6 +16,9 @@ const companyRoutes = require('./company.routes');
 const salaryStructureRoutes = require('./salaryStructure.routes');
 const leaveTypeRoutes = require('./leaveType.routes');
 const leaveBalanceRoutes = require('./leaveBalance.routes');
+const reportsRoutes = require('./reports.routes');
+const notificationSettingsRoutes = require('./notificationSettings.routes');
+const rolesRoutes = require('./roles.routes');
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
@@ -32,5 +35,8 @@ router.use('/companies', companyRoutes);
 router.use('/salary-structures', salaryStructureRoutes);
 router.use('/leave-types', leaveTypeRoutes);
 router.use('/leave-balances', leaveBalanceRoutes);
+router.use('/reports', reportsRoutes);
+router.use('/notification-settings', notificationSettingsRoutes);
+router.use('/roles', rolesRoutes);
 
 module.exports = router;

@@ -21,7 +21,9 @@ import PayslipDetail from './pages/PayslipDetail';
 import MyPayslip from './pages/MyPayslip';
 import SalaryEditor from './pages/SalaryEditor';
 import ReportsDashboard from './pages/ReportsDashboard';
+import ReportDetail from './pages/ReportDetail';
 import SettingsPage from './pages/SettingsPage';
+import RoleGuard, { ADMIN_ROLES, HR_ROLES, PAYROLL_ROLES } from './components/RoleGuard';
 
 function App() {
   return (
@@ -39,30 +41,32 @@ function App() {
 
           {/* Employee Management */}
           <Route path="employees" element={<EmployeeDirectory />} />
-          <Route path="employees/new" element={<EmployeeForm />} />
+          <Route path="employees/new" element={<RoleGuard allowed={HR_ROLES}><EmployeeForm /></RoleGuard>} />
           <Route path="employees/:id" element={<EmployeeProfile />} />
-          <Route path="employees/:id/edit" element={<EmployeeForm />} />
-          <Route path="employees/:id/salary" element={<SalaryEditor />} />
+          <Route path="employees/:id/edit" element={<RoleGuard allowed={HR_ROLES}><EmployeeForm /></RoleGuard>} />
+          <Route path="employees/:id/salary" element={<RoleGuard allowed={PAYROLL_ROLES}><SalaryEditor /></RoleGuard>} />
           <Route path="profile" element={<MyProfilePage />} />
 
           {/* Attendance & Time Off */}
-          <Route path="attendance" element={<AttendanceOverview />} />
+          <Route path="attendance" element={<RoleGuard allowed={ADMIN_ROLES}><AttendanceOverview /></RoleGuard>} />
           <Route path="attendance/me" element={<MyAttendance />} />
-          <Route path="time-off" element={<TimeOffOverview />} />
+          <Route path="time-off" element={<RoleGuard allowed={ADMIN_ROLES}><TimeOffOverview /></RoleGuard>} />
           <Route path="time-off/apply" element={<ApplyLeave />} />
-          <Route path="time-off/approvals" element={<LeaveApprovals />} />
+          <Route path="time-off/approvals" element={<RoleGuard allowed={HR_ROLES}><LeaveApprovals /></RoleGuard>} />
           <Route path="time-off/me" element={<MyLeaves />} />
 
           {/* Payroll */}
-          <Route path="payroll" element={<PayrollOverview />} />
-          <Route path="payroll/process" element={<RunPayroll />} />
-          <Route path="payroll/payslips" element={<PayslipList />} />
-          <Route path="payroll/payslips/:payslipId" element={<PayslipDetail />} />
+          <Route path="payroll" element={<RoleGuard allowed={PAYROLL_ROLES}><PayrollOverview /></RoleGuard>} />
+          <Route path="payroll/process" element={<RoleGuard allowed={PAYROLL_ROLES}><RunPayroll /></RoleGuard>} />
+          <Route path="payroll/payslips" element={<RoleGuard allowed={PAYROLL_ROLES}><PayslipList /></RoleGuard>} />
+          <Route path="payroll/payslips/:payslipId" element={<RoleGuard allowed={PAYROLL_ROLES}><PayslipDetail /></RoleGuard>} />
           <Route path="payroll/my-payslip" element={<MyPayslip />} />
+          <Route path="payslip/:payslipId" element={<PayslipDetail />} />
 
           {/* Reports & Settings */}
-          <Route path="reports" element={<ReportsDashboard />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="reports" element={<RoleGuard allowed={ADMIN_ROLES}><ReportsDashboard /></RoleGuard>} />
+          <Route path="reports/:type" element={<RoleGuard allowed={ADMIN_ROLES}><ReportDetail /></RoleGuard>} />
+          <Route path="settings" element={<RoleGuard allowed={['Admin']}><SettingsPage /></RoleGuard>} />
         </Route>
 
         {/* Catch-all */}

@@ -76,4 +76,27 @@ const rejectLeave = async (req, res, next) => {
   }
 };
 
-module.exports = { applyLeave, getLeaves, approveLeave, rejectLeave };
+const cancelLeave = async (req, res, next) => {
+  try {
+    const leave = await leaveService.cancelLeave(
+      parseInt(req.params.id), req.companyId, req.user.id
+    );
+
+    await auditService.logAction({
+      userId: req.user.id,
+      companyId: req.companyId,
+      action: 'LEAVE_CANCELLED',
+      entityType: 'leave_requests',
+      entityId: leave.id,
+      newValues: { status: 'Cancelled' },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    res.json({ success: true, message: 'Leave cancelled.', data: leave });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { applyLeave, getLeaves, approveLeave, rejectLeave, cancelLeave };

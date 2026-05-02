@@ -78,6 +78,7 @@ export const leaves = {
   getAll: () => apiRequest('/api/leaves'),
   approve: (id) => apiRequest(`/api/leaves/${id}/approve`, { method: 'PUT' }),
   reject: (id, rejectionReason = 'Rejected by manager') => apiRequest(`/api/leaves/${id}/reject`, { method: 'PUT', body: { rejectionReason } }),
+  cancel: (id) => apiRequest(`/api/leaves/${id}/cancel`, { method: 'PUT' }),
 };
 
 // Leave Types APIs
@@ -133,6 +134,32 @@ export const payroll = {
 export const payslips = {
   getById: (id) => apiRequest(`/api/payslip/${id}`),
   download: (id) => apiRequest(`/api/payslip/${id}/download`),
+};
+
+// Roles APIs
+export const roles = {
+  getAll: () => apiRequest('/api/roles'),
+  updatePermissions: (id, permissions) => apiRequest(`/api/roles/${id}/permissions`, { method: 'PUT', body: permissions }),
+};
+
+// Notification Settings APIs
+export const notificationSettings = {
+  get: () => apiRequest('/api/notification-settings'),
+  save: (data) => apiRequest('/api/notification-settings', { method: 'PUT', body: data }),
+};
+
+// Reports APIs
+export const reports = {
+  getSummary: (month, year) => apiRequest(`/api/reports/summary?month=${month}&year=${year}`),
+  getDepartments: (month, year) => apiRequest(`/api/reports/departments?month=${month}&year=${year}`),
+  getMonthlyTrend: (year) => apiRequest(`/api/reports/monthly-trend?year=${year}`),
+  getLeaveDistribution: (month, year) => apiRequest(`/api/reports/leave-distribution?month=${month}&year=${year}`),
+  getHeadcount: (month, year) => apiRequest(`/api/reports/headcount?month=${month}&year=${year}`),
+  getAttendance: (month, year) => apiRequest(`/api/reports/attendance?month=${month}&year=${year}`),
+  getLeave: (month, year) => apiRequest(`/api/reports/leave?month=${month}&year=${year}`),
+  getPayroll: (month, year) => apiRequest(`/api/reports/payroll?month=${month}&year=${year}`),
+  getAttrition: (month, year) => apiRequest(`/api/reports/attrition?month=${month}&year=${year}`),
+  getCompliance: (month, year) => apiRequest(`/api/reports/compliance?month=${month}&year=${year}`),
 };
 
 // Dashboard APIs

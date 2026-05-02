@@ -30,8 +30,11 @@ export default function ApplyLeave() {
       ]);
       const typesRaw = typesRes?.data ?? typesRes;
       setLeaveTypes(Array.isArray(typesRaw) ? typesRaw : []);
-      const balRaw = balancesRes?.data ?? balancesRes;
-      setBalances(Array.isArray(balRaw) ? balRaw : []);
+      // balances response: { success: true, data: [] }
+      const balRaw = Array.isArray(balancesRes?.data) ? balancesRes.data : [];
+      // Only current year's balances
+      const currentYear = new Date().getFullYear();
+      setBalances(balRaw.filter(b => !b.year || b.year === currentYear));
     } catch (err) {
       setError('Failed to load leave data');
     }
@@ -39,7 +42,14 @@ export default function ApplyLeave() {
 
   const getBalanceForType = (typeId) => {
     const bal = balances.find(b => b.leave_type_id === typeId);
-    return bal ? bal.balance : 0;
+    if (!bal) return null;  // not allocated
+    return bal.balance;
+  };
+
+  const balanceLabel = (typeId) => {
+    const b = getBalanceForType(typeId);
+    if (b === null) return 'not allocated';
+    return `${b} days remaining`;
   };
 
   const update = (field) => (e) =>
@@ -57,11 +67,11 @@ export default function ApplyLeave() {
     setError('');
     try {
       await leaves.apply({
-        leave_type_id: form.leaveType,
-        from_date: form.fromDate,
-        to_date: form.toDate,
-        reason: form.reason,
-        days: calcDays()
+        leaveTypeId: parseInt(form.leaveType),
+        startDate: form.fromDate,
+        endDate: form.toDate,
+        totalDays: calcDays(),
+        reason: form.reason || ''
       });
       navigate('/app/time-off/me');
     } catch (err) {
@@ -116,7 +126,7 @@ export default function ApplyLeave() {
                     <option value="" disabled>Select leave type</option>
                     {leaveTypes.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name} ({getBalanceForType(t.id)} days remaining)
+                        {t.name} ({balanceLabel(t.id)})
                       </option>
                     ))}
                   </select>
@@ -209,14 +219,21 @@ export default function ApplyLeave() {
             <h3 className="text-title-sm text-ink">Leave Balance</h3>
           </div>
           <div className="p-5 space-y-4">
-            {leaveTypes.map((type) => (
-              <div key={type.id} className="flex items-center justify-between">
-                <span className="text-body-sm text-ink">{type.name}</span>
-                <span className="text-body-sm font-medium text-ink">
-                  {getBalanceForType(type.id)} days
-                </span>
-              </div>
-            ))}
+            {leaveTypes.length === 0 ? (
+              <p className="text-caption text-muted">No leave types configured.</p>
+            ) : balances.length === 0 ? (
+              <p className="text-caption text-muted">No leave balance allocated yet. Contact your HR/Admin.</p>
+            ) : leaveTypes.map((type) => {
+              const b = getBalanceForType(type.id);
+              return (
+                <div key={type.id} className="flex items-center justify-between">
+                  <span className="text-body-sm text-ink">{type.name}</span>
+                  <span className={`text-body-sm font-medium ${b === null ? 'text-muted' : b === 0 ? 'text-error' : 'text-ink'}`}>
+                    {b === null ? 'N/A' : `${b} days`}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -20,42 +20,49 @@ const statusLabel = {
   leave: 'Leave',
 };
 
+function toLocalDate(d) {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const [y, m, d] = toLocalDate(ts).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtDay(ts) {
+  if (!ts) return '—';
+  const [y, m, d] = toLocalDate(ts).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', { weekday: 'short' });
+}
+
 export default function MyAttendance() {
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
-  const [todayStatus, setTodayStatus] = useState(null);
-  const [recentLogs, setRecentLogs] = useState([]);
-  const [monthlySummary, setMonthlySummary] = useState({});
+  const [todayRecord, setTodayRecord] = useState(null);
+  const [allLogs, setAllLogs] = useState([]);
+  const [viewMonth, setViewMonth] = useState(() => {
+    const n = new Date(); return { month: n.getMonth() + 1, year: n.getFullYear() };
+  });
   const [loading, setLoading] = useState(true);
+  const [checkLoading, setCheckLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchAttendance();
-  }, []);
+  useEffect(() => { fetchAttendance(); }, []);
 
   const fetchAttendance = async () => {
     try {
       setLoading(true);
       const response = await attendance.getAll();
-      const raw = response?.data?.attendance ?? response?.data ?? response;
-      const logs = Array.isArray(raw) ? raw : [];
-      setRecentLogs(logs);
-      
-      // Calculate today's status
-      const today = new Date().toISOString().split('T')[0];
-      const todayLog = logs.find(l => l.date === today);
-      if (todayLog) {
-        setIsCheckedIn(todayLog.check_out_time ? false : !!todayLog.check_in_time);
-        setTodayStatus(todayLog);
-      }
-      
-      // Calculate monthly summary
-      setMonthlySummary({
-        present: logs.filter(l => l.status === 'present').length,
-        absent: logs.filter(l => l.status === 'absent').length,
-        halfDay: logs.filter(l => l.status === 'halfday').length,
-        leave: logs.filter(l => l.status === 'leave').length,
-        totalWorking: logs.length,
-      });
+      const logs = Array.isArray(response?.data?.attendance) ? response.data.attendance : [];
+      const todayIso = toLocalDate(new Date());
+      const rec = logs.find(l => l.date && toLocalDate(l.date) === todayIso);
+      setAllLogs(logs);
+      setTodayRecord(rec || null);
     } catch (err) {
       setError(err.message || 'Failed to load attendance');
     } finally {
@@ -64,24 +71,45 @@ export default function MyAttendance() {
   };
 
   const handleCheckIn = async () => {
-    try {
-      await attendance.checkIn();
-      setIsCheckedIn(true);
-      fetchAttendance();
-    } catch (err) {
-      setError(err.message || 'Check-in failed');
-    }
+    setCheckLoading(true); setError('');
+    try { await attendance.checkIn(); await fetchAttendance(); }
+    catch (err) { setError(err.message || 'Check-in failed'); }
+    finally { setCheckLoading(false); }
   };
 
   const handleCheckOut = async () => {
-    try {
-      await attendance.checkOut();
-      setIsCheckedIn(false);
-      fetchAttendance();
-    } catch (err) {
-      setError(err.message || 'Check-out failed');
-    }
+    setCheckLoading(true); setError('');
+    try { await attendance.checkOut(); await fetchAttendance(); }
+    catch (err) { setError(err.message || 'Check-out failed'); }
+    finally { setCheckLoading(false); }
   };
+
+  const isCheckedIn  = !!todayRecord?.check_in && !todayRecord?.check_out;
+  const isCheckedOut = !!todayRecord?.check_out;
+
+  // Filter logs for view month
+  const monthLogs = allLogs.filter(l => {
+    const ld = toLocalDate(l.date);
+    const [y, m] = ld.split('-').map(Number);
+    return m === viewMonth.month && y === viewMonth.year;
+  });
+
+  const monthlySummary = {
+    present:      monthLogs.filter(l => l.status === 'Present').length,
+    absent:       monthLogs.filter(l => l.status === 'Absent').length,
+    halfDay:      monthLogs.filter(l => l.status === 'Half-Day').length,
+    leave:        monthLogs.filter(l => l.status === 'Leave').length,
+    totalWorking: monthLogs.length,
+  };
+
+  const monthLabel = new Date(viewMonth.year, viewMonth.month - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+  const prevMonth = () => setViewMonth(p => {
+    const d = new Date(p.year, p.month - 2); return { month: d.getMonth() + 1, year: d.getFullYear() };
+  });
+  const nextMonth = () => setViewMonth(p => {
+    const d = new Date(p.year, p.month); return { month: d.getMonth() + 1, year: d.getFullYear() };
+  });
 
   if (loading) {
     return (
@@ -115,20 +143,27 @@ export default function MyAttendance() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
         {/* Check In / Out Card */}
         <div className="bg-canvas border border-hairline rounded-lg p-6 flex flex-col items-center justify-center text-center">
-          <p className="text-caption text-muted mb-1">{todayStatus.date}</p>
+          <p className="text-caption text-muted mb-1">
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
           <div className="w-20 h-20 rounded-full bg-surface-card flex items-center justify-center my-4">
             <Clock size={32} className="text-ink" />
           </div>
-          {isCheckedIn ? (
+          {isCheckedOut ? (
+            <p className="text-body-sm text-success font-medium">
+              Checked out at {fmtTime(todayRecord.check_out)}
+            </p>
+          ) : isCheckedIn ? (
             <>
               <p className="text-body-sm text-muted">
-                Checked in at <span className="font-medium text-ink">{todayStatus.checkInTime}</span>
+                Checked in at <span className="font-medium text-ink">{fmtTime(todayRecord.check_in)}</span>
               </p>
               <button
-                onClick={() => setIsCheckedIn(false)}
-                className="mt-4 btn-primary inline-flex items-center gap-2 bg-error hover:bg-red-600"
+                onClick={handleCheckOut}
+                disabled={checkLoading}
+                className="mt-4 btn-primary inline-flex items-center gap-2 bg-error hover:bg-red-600 disabled:opacity-60"
               >
-                <LogOut size={16} />
+                {checkLoading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <LogOut size={16} />}
                 Check Out
               </button>
             </>
@@ -136,20 +171,22 @@ export default function MyAttendance() {
             <>
               <p className="text-body-sm text-muted">You haven't checked in yet.</p>
               <button
-                onClick={() => setIsCheckedIn(true)}
-                className="mt-4 btn-primary inline-flex items-center gap-2 bg-success hover:bg-emerald-600"
+                onClick={handleCheckIn}
+                disabled={checkLoading}
+                className="mt-4 btn-primary inline-flex items-center gap-2 bg-success hover:bg-emerald-600 disabled:opacity-60"
               >
-                <LogIn size={16} />
+                {checkLoading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <LogIn size={16} />}
                 Check In
               </button>
             </>
           )}
+          {error && <p className="text-caption text-error mt-2">{error}</p>}
         </div>
 
         {/* Monthly Summary */}
         <div className="lg:col-span-2 bg-canvas border border-hairline rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-title-sm text-ink">Monthly Summary — May 2026</h3>
+            <h3 className="text-title-sm text-ink">Monthly Summary — {monthLabel}</h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
@@ -171,7 +208,7 @@ export default function MyAttendance() {
             <span className="text-body-sm text-muted">
               Attendance Rate:{' '}
               <span className="font-medium text-success">
-                {Math.round((monthlySummary.present / monthlySummary.totalWorking) * 100)}%
+                {monthlySummary.totalWorking > 0 ? Math.round((monthlySummary.present / monthlySummary.totalWorking) * 100) : 0}%
               </span>
             </span>
           </div>
@@ -183,11 +220,11 @@ export default function MyAttendance() {
         <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
           <h3 className="text-title-sm text-ink">Attendance Log</h3>
           <div className="flex items-center gap-2">
-            <button className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">
+            <button onClick={prevMonth} className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">
               <ChevronLeft size={16} />
             </button>
-            <span className="text-caption text-muted">May 2026</span>
-            <button className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">
+            <span className="text-caption text-muted">{monthLabel}</span>
+            <button onClick={nextMonth} className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">
               <ChevronRight size={16} />
             </button>
           </div>
@@ -205,28 +242,20 @@ export default function MyAttendance() {
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
-              {recentLogs.map((log, i) => (
+              {monthLogs.length === 0 ? (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-body-sm text-muted">No attendance records for this month.</td></tr>
+              ) : monthLogs.map((log, i) => (
                 <tr key={i} className="hover:bg-surface-soft/50 transition-colors">
-                  <td className="px-5 py-3.5 text-body-sm font-medium text-ink">{log.date}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">{log.day}</td>
-                  <td className="px-5 py-3.5">
-                    <span className={`text-body-sm ${log.checkIn === '—' ? 'text-muted' : 'text-ink'}`}>
-                      {log.checkIn}
-                    </span>
+                  <td className="px-5 py-3.5 text-body-sm font-medium text-ink">{fmtDate(log.date)}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">{fmtDay(log.date)}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-ink">{fmtTime(log.check_in)}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-ink">{fmtTime(log.check_out)}</td>
+                  <td className="px-5 py-3.5 text-body-sm font-medium text-ink">
+                    {log.work_hours ? `${log.work_hours}h` : '—'}
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`text-body-sm ${log.checkOut === '—' ? 'text-muted' : 'text-ink'}`}>
-                      {log.checkOut}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`text-body-sm font-medium ${log.hours === '—' ? 'text-muted' : 'text-ink'}`}>
-                      {log.hours}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className={`badge ${statusBadge[log.status]}`}>
-                      {statusLabel[log.status]}
+                    <span className={`badge badge-${(log.status || '').toLowerCase().replace('-', '')}`}>
+                      {log.status || '—'}
                     </span>
                   </td>
                 </tr>

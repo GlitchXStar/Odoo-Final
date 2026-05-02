@@ -123,4 +123,43 @@ const rejectLeave = async (leaveId, companyId, approverId, rejectionReason) => {
   return result.rows[0];
 };
 
-module.exports = { applyLeave, getLeaves, approveLeave, rejectLeave };
+const cancelLeave = async (leaveId, companyId, userId) => {
+  const leave = await query(
+    'SELECT * FROM leave_requests WHERE id = $1 AND company_id = $2',
+    [leaveId, companyId]
+  );
+
+  if (leave.rows.length === 0) {
+    throw new AppError('Leave request not found.', 404);
+  }
+
+  const leaveRow = leave.rows[0];
+
+  if (leaveRow.status === LEAVE_STATUS.CANCELLED) {
+    throw new AppError('Leave is already cancelled.', 400);
+  }
+
+  if (leaveRow.status === LEAVE_STATUS.REJECTED) {
+    throw new AppError('Cannot cancel a rejected leave.', 400);
+  }
+
+  // If it was Approved, restore the leave balance
+  if (leaveRow.status === LEAVE_STATUS.APPROVED) {
+    const year = new Date(leaveRow.start_date).getFullYear();
+    await query(
+      `UPDATE leave_balances SET used = used - $1, balance = balance + $1
+       WHERE user_id = $2 AND leave_type_id = $3 AND year = $4`,
+      [parseFloat(leaveRow.total_days), leaveRow.user_id, leaveRow.leave_type_id, year]
+    );
+  }
+
+  const result = await query(
+    `UPDATE leave_requests SET status = $1
+     WHERE id = $2 AND company_id = $3 RETURNING *`,
+    [LEAVE_STATUS.CANCELLED, leaveId, companyId]
+  );
+
+  return result.rows[0];
+};
+
+module.exports = { applyLeave, getLeaves, approveLeave, rejectLeave, cancelLeave };
