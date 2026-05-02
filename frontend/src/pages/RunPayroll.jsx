@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Play, CheckCircle, Users, DollarSign,
-  AlertTriangle, ChevronDown
+  ArrowLeft, Play, CheckCircle, Users, IndianRupee,
+  AlertTriangle, ChevronDown, Calendar
 } from 'lucide-react';
+
 import { payroll, employees, salaryStructures } from '../services/api.js';
+
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
 
 const steps = [
   { key: 'review', label: 'Review Employees' },
@@ -201,14 +207,41 @@ export default function RunPayroll() {
           <>
             <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
               <h3 className="text-title-sm text-ink">Employee Summary by Department</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-caption text-muted">Pay Period:</span>
-                <input
-                  type="month"
-                  value={payMonth}
-                  onChange={(e) => setPayMonth(e.target.value)}
-                  className="input-field py-1.5 w-auto text-body-sm"
-                />
+              <div className="flex items-center gap-3">
+                <Calendar size={16} className="text-muted" />
+                <span className="text-body-sm text-muted">Pay Period:</span>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <select
+                      value={parseInt(payMonth.split('-')[1])}
+                      onChange={(e) => {
+                        const y = payMonth.split('-')[0];
+                        setPayMonth(`${y}-${String(e.target.value).padStart(2, '0')}`);
+                      }}
+                      className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer min-w-[140px]"
+                    >
+                      {MONTHS.map((m, i) => (
+                        <option key={m} value={i + 1}>{m}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={parseInt(payMonth.split('-')[0])}
+                      onChange={(e) => {
+                        const m = payMonth.split('-')[1];
+                        setPayMonth(`${e.target.value}-${m}`);
+                      }}
+                      className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer min-w-[90px]"
+                    >
+                      {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                  </div>
+                </div>
               </div>
             </div>
             <div className="overflow-x-auto">

@@ -19,12 +19,11 @@ function getNavItems(role) {
   const isManagement = isAdminExact || isHR || isPayroll;
   const isEmployee   = !isManagement;
 
-  // Employees & HR & Payroll who are NOT Admin or HR see "My" pages
   const canSeeEmployees  = isAdminExact || isHR;
-  const canSeeAttendance = isAdminExact || isHR;
-  const canSeeTimeOff    = isAdminExact || isHR;
+  const canSeeAttendance = isAdminExact || isHR || isPayroll;
+  const canSeeTimeOff    = isAdminExact || isHR || isPayroll;
   const canSeePayroll    = isAdminExact || isPayroll;
-  const canSeeReports    = isAdminExact;
+  const canSeeReports    = isAdminExact || isPayroll;
 
   const main = [
     { to: '/app/dashboard', icon: LayoutDashboard, label: 'Dashboard' },

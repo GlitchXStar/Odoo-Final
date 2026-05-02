@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
-  DollarSign, TrendingUp, TrendingDown, Users,
+  IndianRupee, TrendingUp, TrendingDown, Users,
   ArrowRight, Clock, CheckCircle, AlertCircle
 } from 'lucide-react';
+
 import { dashboard, payroll } from '../../services/api.js';
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const fmt = (val) => {
   const n = parseFloat(val) || 0;
@@ -51,15 +54,15 @@ export default function PayrollDashboard() {
   const netTotal = payrollRuns.reduce((s, r) => s + parseFloat(r.net_salary || 0), 0);
 
   const payrollStats = [
-    { label: 'Gross Salary', value: grossTotal ? fmt(grossTotal) : '—', change: `${payrollRuns.length} records`, trend: 'up', icon: DollarSign },
-    { label: 'Total Deductions', value: deductTotal ? fmt(deductTotal) : '—', change: 'PF + Tax + PT', trend: 'up', icon: TrendingDown },
-    { label: 'Net Disbursed', value: netTotal ? fmt(netTotal) : '—', change: 'take-home total', trend: 'up', icon: TrendingUp },
-    { label: 'Employees Processed', value: pay.total_processed ?? payrollRuns.length, change: `of ${emp.total_employees ?? '—'}`, trend: 'up', icon: Users },
+    { label: 'Gross Salary', value: grossTotal ? fmt(grossTotal) : '—', change: `${payrollRuns.length} records`, icon: IndianRupee },
+    { label: 'Total Deductions', value: deductTotal ? fmt(deductTotal) : '—', change: 'PF + Tax + PT', icon: TrendingDown },
+    { label: 'Net Disbursed', value: netTotal ? fmt(netTotal) : '—', change: 'take-home total', icon: TrendingUp },
+    { label: 'Employees Processed', value: pay.total_processed ?? payrollRuns.length, change: `of ${emp.total_employees ?? '—'}`, icon: Users },
   ];
 
   // Group payroll runs by month/year
   const grouped = payrollRuns.reduce((acc, r) => {
-    const key = `${r.month_name || r.month} ${r.year}`;
+    const key = `${r.month_name || MONTH_NAMES[(r.month || 1) - 1]} ${r.year}`;
     if (!acc[key]) acc[key] = { key, status: r.status, count: 0 };
     acc[key].count++;
     return acc;
@@ -101,11 +104,7 @@ export default function PayrollDashboard() {
               </div>
             </div>
             <p className="text-title-lg text-ink">{stat.value}</p>
-            <div className="flex items-center gap-1.5 mt-1">
-              <TrendingUp size={14} className="text-success" />
-              <span className="text-caption text-success">{stat.change}</span>
-              <span className="text-caption text-muted">vs last month</span>
-            </div>
+            <p className="text-caption text-muted mt-1">{stat.change}</p>
           </div>
         ))}
       </div>

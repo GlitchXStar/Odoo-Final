@@ -23,6 +23,7 @@ export default function AttendanceOverview() {
   const { user } = useAuth();
   const roleName = (user?.role_name || user?.roleName || '').toLowerCase();
   const isHR = roleName === 'admin' || roleName === 'hr officer' || roleName === 'payroll officer';
+  const canOverride = roleName === 'admin' || roleName === 'hr officer';
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -221,19 +222,23 @@ export default function AttendanceOverview() {
                   </td>
                   {isHR && (
                     <td className="px-5 py-3.5">
-                      <div className="relative">
-                        <select
-                          value={rec.status || ''}
-                          onChange={(e) => handleStatusChange(rec, e.target.value)}
-                          disabled={updating === rec.id}
-                          className="input-field py-1 pr-7 text-caption appearance-none cursor-pointer w-32"
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-                      </div>
+                      {canOverride ? (
+                        <div className="relative inline-block">
+                          <select
+                            value={rec.status || ''}
+                            onChange={(e) => handleStatusChange(rec, e.target.value)}
+                            disabled={updating === rec.id}
+                            className="input-field py-1.5 pl-3 pr-8 text-caption appearance-none cursor-pointer w-[130px]"
+                          >
+                            {STATUSES.map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                        </div>
+                      ) : (
+                        <span className="text-caption text-muted">{rec.status || '—'}</span>
+                      )}
                     </td>
                   )}
                 </tr>

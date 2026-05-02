@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Download, Calendar, Users,
   CalendarDays, CalendarOff, TrendingUp, BarChart3,
-  ArrowUpRight, ArrowDownRight, Loader2
+  ArrowUpRight, ArrowDownRight, Loader2, ChevronDown
 } from 'lucide-react';
 
 import { reports } from '../services/api.js';
@@ -86,6 +86,11 @@ function formatSalary(amount) {
   const k = amount / 1000;
   return `₹${Math.round(k)}K`;
 }
+
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
 
 export default function ReportsDashboard() {
   const navigate = useNavigate();
@@ -186,12 +191,36 @@ export default function ReportsDashboard() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Calendar size={16} className="text-muted" />
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="input-field py-1.5 w-auto text-body-sm"
-            />
+            <div className="relative">
+              <select
+                value={parseInt(selectedMonth.split('-')[1])}
+                onChange={(e) => {
+                  const y = selectedMonth.split('-')[0];
+                  setSelectedMonth(`${y}-${String(e.target.value).padStart(2, '0')}`);
+                }}
+                className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer min-w-[140px]"
+              >
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i + 1}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={parseInt(selectedMonth.split('-')[0])}
+                onChange={(e) => {
+                  const m = selectedMonth.split('-')[1];
+                  setSelectedMonth(`${e.target.value}-${m}`);
+                }}
+                className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer min-w-[90px]"
+              >
+                {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+            </div>
           </div>
           <button
             onClick={handleFullExport}
