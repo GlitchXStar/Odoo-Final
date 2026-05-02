@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Download, Eye, ChevronLeft, ChevronRight, Calendar, DollarSign
+  Download, Eye, ChevronLeft, ChevronRight, Calendar, IndianRupee
 } from 'lucide-react';
 import { payroll } from '../services/api.js';
 
@@ -82,7 +82,7 @@ export default function MyPayslip() {
         <div className="bg-canvas border border-hairline rounded-lg p-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-caption text-muted">Gross Salary</span>
-            <DollarSign size={16} className="text-muted" />
+            <IndianRupee size={16} className="text-muted" />
           </div>
           <p className="text-title-lg text-ink">₹{currentSalary.gross.toLocaleString()}</p>
           <p className="text-caption text-muted mt-1">per month</p>
@@ -90,7 +90,7 @@ export default function MyPayslip() {
         <div className="bg-canvas border border-hairline rounded-lg p-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-caption text-muted">Deductions</span>
-            <DollarSign size={16} className="text-muted" />
+            <IndianRupee size={16} className="text-muted" />
           </div>
           <p className="text-title-lg text-error">-₹{currentSalary.totalDeductions.toLocaleString()}</p>
           <p className="text-caption text-muted mt-1">PF + Tax + PT</p>
@@ -98,7 +98,7 @@ export default function MyPayslip() {
         <div className="bg-ink rounded-lg p-5 text-on-primary">
           <div className="flex items-center justify-between mb-2">
             <span className="text-caption text-white/60">Net Pay</span>
-            <DollarSign size={16} className="text-white/60" />
+            <IndianRupee size={16} className="text-white/60" />
           </div>
           <p className="text-title-lg">₹{currentSalary.net.toLocaleString()}</p>
           <p className="text-caption text-white/60 mt-1">take-home per month</p>
@@ -168,9 +168,19 @@ export default function MyPayslip() {
         <div className="px-5 py-4 border-b border-hairline">
           <h3 className="text-title-sm text-ink">Payslip History</h3>
         </div>
+        {/* Table Header */}
+        <div className="hidden sm:grid grid-cols-[1fr_auto] gap-4 px-5 py-2.5 bg-surface-soft border-b border-hairline">
+          <span className="text-caption text-muted font-medium">Month</span>
+          <div className="grid grid-cols-[100px_100px_110px_60px] gap-4 text-right">
+            <span className="text-caption text-muted font-medium">Base Salary</span>
+            <span className="text-caption text-muted font-medium">Deductions</span>
+            <span className="text-caption text-muted font-medium">Net Received</span>
+            <span className="text-caption text-muted font-medium">Actions</span>
+          </div>
+        </div>
         <div className="divide-y divide-hairline">
           {myPayslips.map((ps) => (
-            <div key={ps.id} className="px-5 py-4 flex items-center justify-between">
+            <div key={ps.id} className="px-5 py-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-center hover:bg-surface-soft/30 transition-colors">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-lg bg-surface-card flex items-center justify-center">
                   <Calendar size={18} className="text-muted" />
@@ -184,13 +194,20 @@ export default function MyPayslip() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-6">
-                <div className="hidden sm:flex items-center gap-6 text-body-sm">
-                  <span className="text-muted">₹{Number(ps.gross_salary).toLocaleString('en-IN')}</span>
-                  <span className="text-error">-₹{Number(ps.total_deductions).toLocaleString('en-IN')}</span>
-                  <span className="font-medium text-ink">₹{Number(ps.net_salary).toLocaleString('en-IN')}</span>
+              <div className="grid grid-cols-[100px_100px_110px_60px] gap-4 items-center text-right">
+                <div>
+                  <p className="text-body-sm text-ink">₹{Number(ps.gross_salary).toLocaleString('en-IN')}</p>
+                  <p className="sm:hidden text-caption text-muted">Base Salary</p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div>
+                  <p className="text-body-sm text-error font-medium">-₹{Number(ps.total_deductions).toLocaleString('en-IN')}</p>
+                  <p className="sm:hidden text-caption text-muted">Deductions</p>
+                </div>
+                <div>
+                  <p className="text-body-sm text-ink font-semibold">₹{Number(ps.net_salary).toLocaleString('en-IN')}</p>
+                  <p className="sm:hidden text-caption text-muted">Net Received</p>
+                </div>
+                <div className="flex items-center justify-end gap-1">
                   <Link
                     to={`/app/payslip/${ps.id}`}
                     className="p-1.5 text-muted hover:text-ink hover:bg-surface-card rounded-md transition-all"

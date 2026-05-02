@@ -50,6 +50,14 @@ const createEmployee = async (req, res, next) => {
 
 const updateEmployee = async (req, res, next) => {
   try {
+    // Non-Admin cannot edit their own employee profile
+    if (req.user.roleName !== 'Admin') {
+      const target = await employeeService.getEmployeeById(parseInt(req.params.id), req.companyId);
+      if (target.user_id === req.user.id) {
+        return res.status(403).json({ success: false, message: 'You cannot modify your own employee profile.' });
+      }
+    }
+
     const employee = await employeeService.updateEmployee(parseInt(req.params.id), req.companyId, req.body);
     res.json({ success: true, message: 'Employee updated.', data: employee });
   } catch (err) {

@@ -48,9 +48,9 @@ function App() {
           <Route path="profile" element={<MyProfilePage />} />
 
           {/* Attendance & Time Off */}
-          <Route path="attendance" element={<RoleGuard allowed={ADMIN_ROLES}><AttendanceOverview /></RoleGuard>} />
+          <Route path="attendance" element={<RoleGuard allowed={HR_ROLES}><AttendanceOverview /></RoleGuard>} />
           <Route path="attendance/me" element={<MyAttendance />} />
-          <Route path="time-off" element={<RoleGuard allowed={ADMIN_ROLES}><TimeOffOverview /></RoleGuard>} />
+          <Route path="time-off" element={<RoleGuard allowed={HR_ROLES}><TimeOffOverview /></RoleGuard>} />
           <Route path="time-off/apply" element={<ApplyLeave />} />
           <Route path="time-off/approvals" element={<RoleGuard allowed={HR_ROLES}><LeaveApprovals /></RoleGuard>} />
           <Route path="time-off/me" element={<MyLeaves />} />
@@ -63,9 +63,9 @@ function App() {
           <Route path="payroll/my-payslip" element={<MyPayslip />} />
           <Route path="payslip/:payslipId" element={<PayslipDetail />} />
 
-          {/* Reports & Settings */}
-          <Route path="reports" element={<RoleGuard allowed={ADMIN_ROLES}><ReportsDashboard /></RoleGuard>} />
-          <Route path="reports/:type" element={<RoleGuard allowed={ADMIN_ROLES}><ReportDetail /></RoleGuard>} />
+          {/* Reports & Settings — Admin only */}
+          <Route path="reports" element={<RoleGuard allowed={['Admin']}><ReportsDashboard /></RoleGuard>} />
+          <Route path="reports/:type" element={<RoleGuard allowed={['Admin']}><ReportDetail /></RoleGuard>} />
           <Route path="settings" element={<RoleGuard allowed={['Admin']}><SettingsPage /></RoleGuard>} />
         </Route>
 

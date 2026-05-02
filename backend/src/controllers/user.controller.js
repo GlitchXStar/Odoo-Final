@@ -29,6 +29,17 @@ const getUserById = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
+
+    // Non-Admin cannot update their own user record
+    if (req.user.roleName !== 'Admin' && id === req.user.id) {
+      return res.status(403).json({ success: false, message: 'You cannot modify your own account.' });
+    }
+
+    // Only Admin can change roles
+    if (req.body.roleId && req.user.roleName !== 'Admin') {
+      return res.status(403).json({ success: false, message: 'Only Admin can change user roles.' });
+    }
+
     const oldUser = await userService.getUserById(id, req.companyId);
     const user = await userService.updateUser(id, req.companyId, req.body);
 

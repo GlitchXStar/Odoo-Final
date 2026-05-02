@@ -44,7 +44,7 @@ const updateAttendance = async (req, res, next) => {
   try {
     const { status, remarks } = req.body;
     const record = await attendanceService.updateAttendance(
-      parseInt(req.params.id), req.companyId, { status, remarks }
+      parseInt(req.params.id), req.companyId, req.user.id, { status, remarks }
     );
     res.json({ success: true, message: 'Attendance updated.', data: record });
   } catch (err) {

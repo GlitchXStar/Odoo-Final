@@ -51,10 +51,10 @@ const runPayroll = async (req, res, next) => {
 const getPayroll = async (req, res, next) => {
   try {
     const { userId, month, year } = req.query;
-    const isEmployee = req.user.roleName === 'Employee';
+    const canViewAll = req.user.roleName === 'Admin' || req.user.roleName === 'Payroll Officer';
 
-    // Employees only see their own; Admins/Officers see all (or filter by userId)
-    const effectiveUserId = isEmployee ? req.user.id : (userId ? parseInt(userId) : null);
+    // Only Admin & Payroll Officer can see all payroll; others see only their own
+    const effectiveUserId = canViewAll ? (userId ? parseInt(userId) : null) : req.user.id;
 
     const result = await payrollService.getPayrollByUser(req.companyId, effectiveUserId, {
       month: month ? parseInt(month) : undefined,
