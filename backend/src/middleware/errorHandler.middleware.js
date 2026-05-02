@@ -1,5 +1,9 @@
 const errorHandler = (err, req, res, _next) => {
-  console.error('Error:', err.stack || err.message);
+  const knownPgError = ['23505', '23503', '23514'].includes(err.code);
+  const is4xx = err.statusCode >= 400 && err.statusCode < 500;
+  if (!is4xx && !knownPgError) {
+    console.error('Error:', err.stack || err.message);
+  }
 
   // PostgreSQL duplicate key error
   if (err.code === '23505') {

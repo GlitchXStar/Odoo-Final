@@ -149,8 +149,7 @@ const getAttendance = async (companyId, { userId, date, month, year, page = 1, l
     params.push(month, year);
   }
 
-  const countSql = sql.replace(/SELECT .+ FROM/, 'SELECT COUNT(*) FROM');
-  const countResult = await query(countSql, params);
+  const countResult = await query(`SELECT COUNT(*) FROM (${sql}) AS _count`, params);
   const total = parseInt(countResult.rows[0].count);
 
   sql += ` ORDER BY a.date DESC, a.check_in DESC LIMIT $${idx++} OFFSET $${idx++}`;

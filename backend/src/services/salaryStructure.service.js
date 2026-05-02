@@ -2,6 +2,15 @@ const { query } = require('../config/db');
 const { AppError } = require('../middleware/errorHandler.middleware');
 
 const createSalaryStructure = async (companyId, data) => {
+  // Verify user belongs to this company
+  const userCheck = await query(
+    'SELECT id FROM users WHERE id = $1 AND company_id = $2 AND is_active = true',
+    [data.userId, companyId]
+  );
+  if (userCheck.rows.length === 0) {
+    throw new AppError('User not found in this company.', 404);
+  }
+
   // Deactivate previous active structure for this user
   await query(
     `UPDATE salary_structure SET is_active = false

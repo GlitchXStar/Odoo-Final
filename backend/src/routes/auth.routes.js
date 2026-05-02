@@ -5,10 +5,11 @@ const authMiddleware = require('../middleware/auth.middleware');
 const roleMiddleware = require('../middleware/role.middleware');
 const companyScopeMiddleware = require('../middleware/companyScope.middleware');
 const { validate } = require('../middleware/validate.middleware');
-const { createUserSchema, loginSchema, changePasswordSchema, requestOtpSchema, verifyOtpSchema } = require('../validations/auth.validation');
+const { registerAdminSchema, createUserSchema, loginSchema, changePasswordSchema, requestOtpSchema, verifyOtpSchema } = require('../validations/auth.validation');
 const { ROLES } = require('../config/constants');
 
 // Public
+router.post('/register', validate(registerAdminSchema), authController.registerAdmin);
 router.post('/login', validate(loginSchema), authController.login);
 router.post('/request-otp', validate(requestOtpSchema), authController.requestOTP);
 router.post('/verify-otp', validate(verifyOtpSchema), authController.verifyOTP);

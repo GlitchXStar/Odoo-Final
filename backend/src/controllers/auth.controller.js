@@ -1,6 +1,54 @@
 const authService = require('../services/auth.service');
 const auditService = require('../services/audit.service');
 const otpService = require('../services/otp.service');
+const { sendWelcomeAdminEmail, sendCredentialsEmail } = require('../services/email.service');
+
+const registerAdmin = async (req, res, next) => {
+  try {
+    const result = await authService.registerAdmin(req.body);
+
+    await auditService.logAction({
+      userId: result.user.id,
+      companyId: result.company.id,
+      action: 'ADMIN_REGISTERED',
+      entityType: 'users',
+      entityId: result.user.id,
+      newValues: {
+        email: result.user.email,
+        loginId: result.loginId,
+        companyName: result.company.name,
+        companyCode: result.company.code,
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    // Fire-and-forget — email failure must not block the registration response
+    sendWelcomeAdminEmail(result.user.email, {
+      firstName:   result.user.first_name,
+      lastName:    result.user.last_name,
+      loginId:     result.loginId,
+      companyName: result.company.name,
+      companyCode: result.company.code,
+    }).catch((err) => console.error('Welcome email failed:', err.message));
+
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful. You can now log in with your email/Login ID and password.',
+      data: {
+        loginId: result.loginId,
+        email: result.user.email,
+        company: {
+          id: result.company.id,
+          name: result.company.name,
+          code: result.company.code,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 const createUser = async (req, res, next) => {
   try {
@@ -23,9 +71,17 @@ const createUser = async (req, res, next) => {
       userAgent: req.get('user-agent'),
     });
 
+    // Fire-and-forget credentials email — includes company name for context
+    sendCredentialsEmail(result.user.email, {
+      firstName:         result.user.first_name,
+      loginId:           result.loginId,
+      temporaryPassword: result.generatedPassword,
+      companyName:       result.user.company_name || '',
+    }).catch((e) => console.error('Credentials email failed:', e.message));
+
     res.status(201).json({
       success: true,
-      message: 'User created successfully. Share the credentials with the employee.',
+      message: 'User created successfully. Credentials have been emailed to the user.',
       data: {
         user: result.user,
         credentials: {
@@ -129,4 +185,4 @@ const verifyOTP = async (req, res, next) => {
   }
 };
 
-module.exports = { createUser, login, changePassword, requestOTP, verifyOTP };
+module.exports = { registerAdmin, createUser, login, changePassword, requestOTP, verifyOTP };

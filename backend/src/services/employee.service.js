@@ -20,8 +20,7 @@ const getAllEmployees = async (companyId, { page = 1, limit = 20, status, depart
     params.push(department);
   }
 
-  const countSql = sql.replace(/SELECT .+ FROM/, 'SELECT COUNT(*) FROM');
-  const countResult = await query(countSql, params);
+  const countResult = await query(`SELECT COUNT(*) FROM (${sql}) AS _count`, params);
   const total = parseInt(countResult.rows[0].count);
 
   sql += ` ORDER BY ep.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`;
@@ -62,11 +61,7 @@ const getEmployeeByUserId = async (userId, companyId) => {
     [userId, companyId]
   );
 
-  if (result.rows.length === 0) {
-    throw new AppError('Employee profile not found.', 404);
-  }
-
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 const createEmployee = async (companyId, data) => {

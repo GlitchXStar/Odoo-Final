@@ -42,4 +42,29 @@ const verifyOtpSchema = Joi.object({
   }),
 });
 
-module.exports = { createUserSchema, loginSchema, changePasswordSchema, requestOtpSchema, verifyOtpSchema };
+const registerAdminSchema = Joi.object({
+  // Admin personal details
+  firstName: Joi.string().min(1).max(100).required(),
+  lastName:  Joi.string().min(1).max(100).required(),
+  email:     Joi.string().email().required(),
+  phone:     Joi.string().max(20).allow(null, ''),
+  password:  Joi.string().min(8).max(128).required()
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%&*])/)
+    .messages({
+      'string.pattern.base': 'Password must contain uppercase, lowercase, digit and a special character (!@#$%&*).',
+    }),
+
+  // Company details
+  companyName:    Joi.string().min(2).max(200).required(),
+  companyCode:    Joi.string().alphanum().min(2).max(20).required()
+    .messages({ 'string.alphanum': 'Company code must be alphanumeric (letters and numbers only).' }),
+  companyEmail:   Joi.string().email().allow(null, ''),
+  companyPhone:   Joi.string().max(20).allow(null, ''),
+  companyAddress: Joi.string().max(500).allow(null, ''),
+  companyCity:    Joi.string().max(100).allow(null, ''),
+  companyState:   Joi.string().max(100).allow(null, ''),
+  companyCountry: Joi.string().max(100).default('India'),
+  companyPincode: Joi.string().max(20).allow(null, ''),
+});
+
+module.exports = { registerAdminSchema, createUserSchema, loginSchema, changePasswordSchema, requestOtpSchema, verifyOtpSchema };

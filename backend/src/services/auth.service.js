@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { query } = require('../config/db');
+const { query, getClient } = require('../config/db');
 const { AppError } = require('../middleware/errorHandler.middleware');
 
 // ─── Auto Password Generation ───────────────────────────────────
@@ -37,16 +37,15 @@ const generateSecurePassword = (length = 12) => {
 };
 
 // ─── Login ID Generation ────────────────────────────────────────
-// Format: [CompanyCode2][Initials4][Year4][Serial4]
-// Example: OIJODO20220001
+// Format: [CompanyCode4][Initials4][Year4][Serial4]
+// Example: TC4XTE2026 0001 (prefix = company code, unique per company)
 const generateLoginId = async (companyId, firstName, lastName, joiningYear) => {
-  // 1. Get company name for prefix
-  const companyResult = await query('SELECT name FROM companies WHERE id = $1', [companyId]);
+  // 1. Get company code for prefix (unique per company — avoids cross-company loginId collisions)
+  const companyResult = await query('SELECT code FROM companies WHERE id = $1', [companyId]);
   if (companyResult.rows.length === 0) {
     throw new AppError('Company not found.', 404);
   }
-  const companyName = companyResult.rows[0].name.replace(/[^A-Za-z]/g, '');
-  const companyCode = companyName.substring(0, 2).toUpperCase();
+  const companyCode = companyResult.rows[0].code.replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase();
 
   // 2. Employee initials (first 2 of first name + first 2 of last name)
   const fnClean = firstName.replace(/[^A-Za-z]/g, '');
@@ -57,14 +56,14 @@ const generateLoginId = async (companyId, firstName, lastName, joiningYear) => {
   const yearStr = String(joiningYear);
 
   // 4. Get next serial for this company + year
+  // RIGHT(login_id, 8) extracts last 8 chars = Year4+Serial4, works regardless of prefix length
   const serialResult = await query(
     `SELECT COALESCE(MAX(CAST(RIGHT(login_id, 4) AS INTEGER)), 0) AS max_serial
      FROM users
      WHERE company_id = $1
        AND login_id IS NOT NULL
-       AND LENGTH(login_id) >= 14
-       AND SUBSTRING(login_id, 7, 4) = $2`,
-    [companyId, yearStr]
+       AND RIGHT(login_id, 8) LIKE $2`,
+    [companyId, `${yearStr}%`]
   );
 
   const nextSerial = (serialResult.rows[0].max_serial || 0) + 1;
@@ -120,6 +119,7 @@ const createUser = async ({ email, firstName, lastName, phone, companyId, roleId
   );
 
   const user = result.rows[0];
+  user.company_name = company.rows[0].name;
 
   return {
     user,
@@ -206,4 +206,78 @@ const generateToken = (userId, companyId, roleId) => {
   );
 };
 
-module.exports = { createUser, login, changePassword, generateLoginId, generateSecurePassword };
+// ─── Register First Admin (public, no auth required) ────────────
+// Creates company + admin user atomically inside a transaction.
+// The admin sets their own password on first login via change-password.
+const registerAdmin = async ({ firstName, lastName, email, phone, password,
+                               companyName, companyCode, companyEmail, companyPhone,
+                               companyAddress, companyCity, companyState,
+                               companyCountry, companyPincode }) => {
+  // Guard: email must not already be registered
+  const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
+  if (existing.rows.length > 0) {
+    throw new AppError('Email already registered.', 409);
+  }
+
+  // Guard: company code must be unique
+  const existingCode = await query('SELECT id FROM companies WHERE code = $1', [companyCode]);
+  if (existingCode.rows.length > 0) {
+    throw new AppError('Company code already in use.', 409);
+  }
+
+  // Fetch the Admin role id
+  const roleResult = await query("SELECT id FROM roles WHERE name = 'Admin' AND is_active = true LIMIT 1");
+  if (roleResult.rows.length === 0) {
+    throw new AppError('Admin role not found. Ensure roles are seeded in the database.', 500);
+  }
+  const adminRoleId = roleResult.rows[0].id;
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Create the company
+    const companyResult = await client.query(
+      `INSERT INTO companies (name, code, email, phone, address, city, state, country, pincode)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [companyName, companyCode.toUpperCase(),
+       companyEmail || null, companyPhone || null,
+       companyAddress || null, companyCity || null,
+       companyState || null, companyCountry || 'India',
+       companyPincode || null]
+    );
+    const company = companyResult.rows[0];
+
+    // 2. Build loginId directly (company not committed yet — can't query it)
+    const joiningYear = new Date().getFullYear();
+    const ccPrefix = companyCode.replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase();
+    const fnC = firstName.replace(/[^A-Za-z]/g, '').substring(0, 2).toUpperCase();
+    const lnC = lastName.replace(/[^A-Za-z]/g, '').substring(0, 2).toUpperCase();
+    const loginId = `${ccPrefix}${fnC}${lnC}${joiningYear}0001`;
+
+    // 3. Create the admin user (password already set — is_first_login = FALSE)
+    const userResult = await client.query(
+      `INSERT INTO users (company_id, role_id, email, password_hash, first_name, last_name,
+                          phone, login_id, is_first_login, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, TRUE)
+       RETURNING id, company_id, role_id, email, first_name, last_name, phone, login_id, is_first_login, created_at`,
+      [company.id, adminRoleId, email, passwordHash,
+       firstName, lastName, phone || null, loginId]
+    );
+    const user = userResult.rows[0];
+
+    await client.query('COMMIT');
+
+    return { user, company, loginId };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+module.exports = { createUser, login, changePassword, generateLoginId, generateSecurePassword, registerAdmin };

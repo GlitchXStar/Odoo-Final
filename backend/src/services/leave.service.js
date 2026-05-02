@@ -63,8 +63,7 @@ const getLeaves = async (companyId, { userId, status, page = 1, limit = 20 }) =>
     params.push(status);
   }
 
-  const countSql = sql.replace(/SELECT .+ FROM/, 'SELECT COUNT(*) FROM');
-  const countResult = await query(countSql, params);
+  const countResult = await query(`SELECT COUNT(*) FROM (${sql}) AS _count`, params);
   const total = parseInt(countResult.rows[0].count);
 
   sql += ` ORDER BY lr.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`;

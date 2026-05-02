@@ -1,91 +1,150 @@
 require('dotenv').config();
-const app = require('./src/app');
+const app  = require('./src/app');
 const { pool } = require('./src/config/db');
 
 const PORT = process.env.PORT || 3000;
 
+// ── ANSI helpers ─────────────────────────────────────────────────────────────
+const R    = '\x1b[0m';
+const BOLD = '\x1b[1m';
+const DIM  = '\x1b[2m';
+const c    = (code, s) => `\x1b[${code}m${s}${R}`;
+const grn  = s => c(92, s);
+const red  = s => c(91, s);
+const yel  = s => c(93, s);
+const blu  = s => c(94, s);
+const cyn  = s => c(96, s);
+const dim  = s => `${DIM}${s}${R}`;
+const bold = s => `${BOLD}${s}${R}`;
+
+// ── Route table ───────────────────────────────────────────────────────────────
+const ROUTES = [
+  // [method, path, note]
+  ['POST', '/api/auth/register',                   'public — new admin + company'],
+  ['POST', '/api/auth/login',                      'email or login_id'],
+  ['POST', '/api/auth/request-otp',                'send OTP via email'],
+  ['POST', '/api/auth/verify-otp',                 'verify OTP → JWT'],
+  ['POST', '/api/auth/create-user',                'Admin/HR only'],
+  ['POST', '/api/auth/change-password',            'authenticated'],
+  [null],
+  ['GET',  '/api/companies/me',                    'own company'],
+  ['PUT',  '/api/companies/me',                    'Admin only'],
+  [null],
+  ['GET',  '/api/users',                           ''],
+  ['GET',  '/api/users/:id',                       ''],
+  ['PUT',  '/api/users/:id',                       ''],
+  ['DELETE','/api/users/:id',                      'Admin only'],
+  [null],
+  ['GET',  '/api/employees',                       ''],
+  ['GET',  '/api/employees/me',                    ''],
+  ['GET',  '/api/employees/:id',                   ''],
+  ['POST', '/api/employees',                       'Admin/HR'],
+  ['PUT',  '/api/employees/:id',                   'Admin/HR'],
+  [null],
+  ['GET',  '/api/shifts',                          ''],
+  ['POST', '/api/shifts',                          'Admin/HR'],
+  ['PUT',  '/api/shifts/:id',                      'Admin/HR'],
+  ['POST', '/api/shifts/assign',                   'Admin/HR'],
+  [null],
+  ['POST', '/api/attendance/check-in',             ''],
+  ['POST', '/api/attendance/check-out',            ''],
+  ['GET',  '/api/attendance',                      ''],
+  [null],
+  ['GET',  '/api/leave-types',                     ''],
+  ['POST', '/api/leave-types',                     'Admin/HR'],
+  ['PUT',  '/api/leave-types/:id',                 'Admin/HR'],
+  ['DELETE','/api/leave-types/:id',               'Admin/HR'],
+  [null],
+  ['GET',  '/api/leave-balances',                  ''],
+  ['POST', '/api/leave-balances/allocate',         'Admin/HR'],
+  ['POST', '/api/leave-balances/bulk-allocate',    'Admin/HR'],
+  [null],
+  ['POST', '/api/leaves/apply',                    ''],
+  ['GET',  '/api/leaves',                          ''],
+  ['PUT',  '/api/leaves/:id/approve',              'Admin/HR'],
+  ['PUT',  '/api/leaves/:id/reject',               'Admin/HR'],
+  [null],
+  ['GET',  '/api/holidays',                        ''],
+  ['POST', '/api/holidays',                        'Admin/HR'],
+  ['DELETE','/api/holidays/:id',                   'Admin/HR'],
+  [null],
+  ['GET',  '/api/salary-structures',               'Admin/HR/Payroll'],
+  ['GET',  '/api/salary-structures/user/:id',      ''],
+  ['GET',  '/api/salary-structures/user/:id/active',''],
+  ['POST', '/api/salary-structures',               'Admin/Payroll'],
+  ['PUT',  '/api/salary-structures/:id',           'Admin/Payroll'],
+  [null],
+  ['POST', '/api/payroll/run',                     'Admin/Payroll'],
+  ['GET',  '/api/payroll',                         ''],
+  ['GET',  '/api/payslip/:id',                     ''],
+  ['GET',  '/api/payslip/:id/download',            'PDF'],
+  [null],
+  ['GET',  '/api/dashboard/stats',                 ''],
+  ['GET',  '/api/dashboard/departments',           ''],
+  ['GET',  '/api/dashboard/activity',              ''],
+];
+
+const METHOD_COLOR = { GET: 94, POST: 92, PUT: 93, DELETE: 91, PATCH: 95 };
+
+function printRoutes() {
+  for (const row of ROUTES) {
+    if (!row[0]) { console.log(''); continue; }
+    const [method, path, note] = row;
+    const mc  = METHOD_COLOR[method] || 97;
+    const m   = c(mc, method.padEnd(7));
+    const p   = bold(path.padEnd(46));
+    const n   = note ? dim(`  ${note}`) : '';
+    console.log(`  ${m} ${p}${n}`);
+  }
+}
+
+// ── Startup ───────────────────────────────────────────────────────────────────
 async function startServer() {
   try {
-    // Test database connection
-    const client = await pool.connect();
-    console.log('✓ PostgreSQL connected successfully');
-    client.release();
+    const dbClient = await pool.connect();
+    dbClient.release();
 
     app.listen(PORT, () => {
-      console.log(`✓ EmPay HRMS API server running on port ${PORT}`);
-      console.log(`✓ Health check: http://localhost:${PORT}/health`);
-      console.log(`✓ API base URL: http://localhost:${PORT}/api`);
-      console.log('──────────────────────────────────────');
-      console.log('Available endpoints:');
-      console.log('  POST   /api/auth/login           (email OR login_id)');
-      console.log('  POST   /api/auth/create-user     (Admin/HR only)');
-      console.log('  POST   /api/auth/change-password  (first-login required)');
-      console.log('  POST   /api/auth/request-otp      (send OTP via email)');
-      console.log('  POST   /api/auth/verify-otp       (verify OTP → JWT)');
-      console.log('  GET    /api/users');
-      console.log('  GET    /api/users/:id');
-      console.log('  PUT    /api/users/:id');
-      console.log('  DELETE /api/users/:id');
-      console.log('  GET    /api/employees');
-      console.log('  GET    /api/employees/me');
-      console.log('  POST   /api/employees');
-      console.log('  PUT    /api/employees/:id');
-      console.log('  POST   /api/shifts');
-      console.log('  GET    /api/shifts');
-      console.log('  PUT    /api/shifts/:id');
-      console.log('  POST   /api/employee-shifts');
-      console.log('  POST   /api/attendance/check-in');
-      console.log('  POST   /api/attendance/check-out');
-      console.log('  GET    /api/attendance');
-      console.log('  POST   /api/leaves/apply');
-      console.log('  GET    /api/leaves');
-      console.log('  PUT    /api/leaves/:id/approve');
-      console.log('  PUT    /api/leaves/:id/reject');
-      console.log('  POST   /api/holidays');
-      console.log('  GET    /api/holidays');
-      console.log('  DELETE /api/holidays/:id');
-      console.log('  POST   /api/payroll/run');
-      console.log('  GET    /api/payroll');
-      console.log('  GET    /api/payslip/:payroll_id');
-      console.log('  GET    /api/payslip/:payroll_id/download');
-      console.log('  GET    /api/dashboard/stats');
-      console.log('  GET    /api/dashboard/departments');
-      console.log('  GET    /api/dashboard/activity');
-      console.log('  GET    /api/companies');
-      console.log('  GET    /api/companies/:id');
-      console.log('  POST   /api/companies');
-      console.log('  PUT    /api/companies/:id');
-      console.log('  GET    /api/salary-structures');
-      console.log('  GET    /api/salary-structures/user/:userId');
-      console.log('  GET    /api/salary-structures/user/:userId/active');
-      console.log('  POST   /api/salary-structures');
-      console.log('  PUT    /api/salary-structures/:id');
-      console.log('  GET    /api/leave-types');
-      console.log('  POST   /api/leave-types');
-      console.log('  PUT    /api/leave-types/:id');
-      console.log('  DELETE /api/leave-types/:id');
-      console.log('  GET    /api/leave-balances');
-      console.log('  POST   /api/leave-balances/allocate');
-      console.log('  POST   /api/leave-balances/bulk-allocate');
-      console.log('──────────────────────────────────────');
+      const w = 65;
+      const line = '═'.repeat(w);
+      const env  = process.env.NODE_ENV || 'development';
+
+      console.log('');
+      console.log(blu(bold(line)));
+      console.log(blu(bold(`  EmPay HRMS  —  API Server`)));
+      console.log(blu(line));
+      console.log('');
+      console.log(`  ${grn('●')} ${bold('Status')}   ${grn('Running')}`);
+      console.log(`  ${grn('●')} ${bold('Port')}     ${cyn(PORT)}`);
+      console.log(`  ${grn('●')} ${bold('Env')}      ${cyn(env)}`);
+      console.log(`  ${grn('●')} ${bold('Database')} ${grn('PostgreSQL connected')}`);
+      console.log('');
+      console.log(`  ${dim('Health')}   ${cyn(`http://localhost:${PORT}/health`)}`);
+      console.log(`  ${dim('API')}      ${cyn(`http://localhost:${PORT}/api`)}`);
+      console.log('');
+      console.log(dim('─'.repeat(w)));
+      console.log(`  ${bold(c(96, 'ENDPOINTS'))}`);
+      console.log(dim('─'.repeat(w)));
+      printRoutes();
+      console.log('');
+      console.log(blu(line));
+      console.log('');
     });
   } catch (err) {
-    console.error('✗ Failed to start server:', err.message);
+    console.error(`\n  ${red('✗')} Failed to start: ${bold(err.message)}\n`);
     process.exit(1);
   }
 }
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+const shutdown = async (signal) => {
+  console.log(`\n  ${yel('◼')} ${dim(signal)} — shutting down gracefully…`);
   await pool.end();
+  console.log(`  ${grn('✓')} Database pool closed\n`);
   process.exit(0);
-});
+};
 
-process.on('SIGINT', async () => {
-  console.log('\nSIGINT received. Shutting down gracefully...');
-  await pool.end();
-  process.exit(0);
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 startServer();

@@ -36,4 +36,22 @@ const updateCompany = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllCompanies, getCompanyById, createCompany, updateCompany };
+const getMyCompany = async (req, res, next) => {
+  try {
+    const company = await companyService.getCompanyById(req.user.companyId);
+    res.json({ success: true, data: company });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateMyCompany = async (req, res, next) => {
+  try {
+    const company = await companyService.updateCompany(req.user.companyId, req.body);
+    res.json({ success: true, message: 'Company updated.', data: company });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getAllCompanies, getCompanyById, createCompany, updateCompany, getMyCompany, updateMyCompany };

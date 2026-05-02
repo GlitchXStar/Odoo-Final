@@ -10,8 +10,8 @@ const runPayroll = async (companyId, { userId, month, year, generatedBy }) => {
 
     // Check if payroll already exists
     const existing = await client.query(
-      'SELECT id FROM payroll WHERE user_id = $1 AND month = $2 AND year = $3',
-      [userId, month, year]
+      'SELECT id FROM payroll WHERE user_id = $1 AND company_id = $2 AND month = $3 AND year = $4',
+      [userId, companyId, month, year]
     );
     if (existing.rows.length > 0) {
       throw new AppError(`Payroll already processed for ${month}/${year}.`, 409);

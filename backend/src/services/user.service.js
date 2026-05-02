@@ -22,9 +22,7 @@ const getAllUsers = async (companyId, { page = 1, limit = 20, isActive, roleId }
     params.push(roleId);
   }
 
-  // Count total
-  const countSql = sql.replace(/SELECT .+ FROM/, 'SELECT COUNT(*) FROM');
-  const countResult = await query(countSql, params);
+  const countResult = await query(`SELECT COUNT(*) FROM (${sql}) AS _count`, params);
   const total = parseInt(countResult.rows[0].count);
 
   sql += ` ORDER BY u.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`;

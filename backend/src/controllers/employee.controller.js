@@ -28,6 +28,9 @@ const getEmployeeById = async (req, res, next) => {
 const getMyProfile = async (req, res, next) => {
   try {
     const employee = await employeeService.getEmployeeByUserId(req.user.id, req.companyId);
+    if (!employee) {
+      return res.json({ success: true, data: null, message: 'No employee profile found. Ask your admin to create one.' });
+    }
     res.json({ success: true, data: employee });
   } catch (err) {
     next(err);

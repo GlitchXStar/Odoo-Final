@@ -52,13 +52,9 @@ const requestOTP = async (identifier) => {
     [user.id, otpCode, expiresAt]
   );
 
-  // Send OTP via email
-  try {
-    await emailService.sendOTPEmail(user.email, otpCode, user.first_name);
-  } catch (err) {
-    console.error('Failed to send OTP email:', err.message);
-    throw new AppError('Failed to send OTP email. Please try again.', 500);
-  }
+  // Send OTP via email — fire-and-forget so the response is instant
+  emailService.sendOTPEmail(user.email, otpCode, user.first_name)
+    .catch((err) => console.error('Failed to send OTP email:', err.message));
 
   // Mask email for response (jo***@example.com)
   const [localPart, domain] = user.email.split('@');
