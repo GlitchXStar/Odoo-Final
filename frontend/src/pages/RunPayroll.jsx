@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, CheckCircle, Users, IndianRupee,
-  AlertTriangle, ChevronDown, Calendar
+  AlertTriangle, ChevronDown, Calendar, Download
 } from 'lucide-react';
 
 import { payroll, employees, salaryStructures } from '../services/api.js';
@@ -30,6 +30,7 @@ export default function RunPayroll() {
   const [totalGross, setTotalGross] = useState(0);
   const [totalDeductions, setTotalDeductions] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
+  const [skippedCount, setSkippedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -45,7 +46,9 @@ export default function RunPayroll() {
         salaryStructures.getAll().catch(() => ({ data: [] }))
       ]);
       const empList = empRes?.data?.employees ?? empRes?.data ?? empRes;
-      const employeeArr = Array.isArray(empList) ? empList : [];
+      const allEmployees = Array.isArray(empList) ? empList : [];
+      const employeeArr = allEmployees.filter(emp => emp.status === 'Active');
+      setSkippedCount(allEmployees.length - employeeArr.length);
       const salList = salRes?.data ?? salRes;
       const salArr = Array.isArray(salList) ? salList : [];
 
@@ -89,10 +92,12 @@ export default function RunPayroll() {
       // Build per-employee detail rows
       const detail = employeeArr.map((emp) => {
         const est = estimateMap[emp.user_id] || {};
+        const hasSalary = !!est.gross_salary;
         return {
           name: `${emp.first_name || ''} ${emp.last_name || ''}`.trim(),
           department: emp.department || '—',
           designation: emp.designation || '—',
+          hasSalary,
           basic: Number(est.basic || 0),
           hra: Number(est.hra || 0),
           allowances: Number(est.allowances || 0),
@@ -271,6 +276,14 @@ export default function RunPayroll() {
                 </tfoot>
               </table>
             </div>
+            {skippedCount > 0 && (
+              <div className="px-6 py-3 bg-surface-soft border-t border-hairline flex items-center gap-2">
+                <AlertTriangle size={14} className="text-muted" />
+                <p className="text-caption text-muted">
+                  {skippedCount} employee{skippedCount !== 1 ? 's' : ''} skipped (Inactive, On Leave, Terminated, or Resigned)
+                </p>
+              </div>
+            )}
           </>
         )}
 
@@ -293,13 +306,32 @@ export default function RunPayroll() {
             {/* Toggle detail */}
             <div className="mb-4 flex items-center justify-between">
               <p className="text-body-sm text-muted">Per-employee salary breakdown</p>
-              <button
-                onClick={() => setShowDetail((v) => !v)}
-                className="text-body-sm text-primary hover:underline inline-flex items-center gap-1"
-              >
-                {showDetail ? 'Hide Details' : 'View Details'}
-                <ChevronDown size={14} className={`transition-transform ${showDetail ? 'rotate-180' : ''}`} />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    const rows = [['Employee','Department','Designation','Basic','HRA','Allowances','Gross','PF','ESI','PT','Tax','Total Deductions','Net']];
+                    employeeDetail.forEach(emp => {
+                      rows.push([emp.name, emp.department, emp.designation, emp.basic, emp.hra, emp.allowances, emp.gross, emp.pf, emp.esi, emp.pt, emp.incomeTax, emp.totalDeductions, emp.net]);
+                    });
+                    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href = url; a.download = `payroll-breakdown-${payMonth}.csv`; a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="text-body-sm text-muted hover:text-ink inline-flex items-center gap-1"
+                >
+                  <Download size={14} />
+                  Export
+                </button>
+                <button
+                  onClick={() => setShowDetail((v) => !v)}
+                  className="text-body-sm text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  {showDetail ? 'Hide Details' : 'View Details'}
+                  <ChevronDown size={14} className={`transition-transform ${showDetail ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
             </div>
 
             {showDetail && (
@@ -323,10 +355,13 @@ export default function RunPayroll() {
                   </thead>
                   <tbody className="divide-y divide-hairline">
                     {employeeDetail.map((emp, i) => (
-                      <tr key={i} className="hover:bg-surface-soft/50">
+                      <tr key={i} className={`hover:bg-surface-soft/50 ${!emp.hasSalary ? 'bg-warning/5' : ''}`}>
                         <td className="px-4 py-2.5">
                           <p className="text-body-sm font-medium text-ink">{emp.name}</p>
                           <p className="text-caption text-muted">{emp.designation}</p>
+                          {!emp.hasSalary && (
+                            <p className="text-[10px] text-orange-500 font-medium mt-0.5">No salary assigned</p>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-caption text-muted">{emp.department}</td>
                         <td className="px-4 py-2.5 text-body-sm text-ink text-right">₹{emp.basic.toLocaleString('en-IN')}</td>
@@ -343,6 +378,20 @@ export default function RunPayroll() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {employeeDetail.filter(e => !e.hasSalary).length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-start gap-3 mb-4">
+                <AlertTriangle size={18} className="text-orange-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-body-sm font-medium text-ink">
+                    {employeeDetail.filter(e => !e.hasSalary).length} employee{employeeDetail.filter(e => !e.hasSalary).length > 1 ? 's have' : ' has'} no salary assigned
+                  </p>
+                  <p className="text-caption text-muted">
+                    These employees will be skipped during payroll processing. Assign a salary structure before running payroll.
+                  </p>
+                </div>
               </div>
             )}
 

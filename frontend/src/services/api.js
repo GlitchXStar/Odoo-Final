@@ -73,6 +73,7 @@ export const attendance = {
   checkOut: () => apiRequest('/api/attendance/check-out', { method: 'POST' }),
   getAll: (params = '') => apiRequest(`/api/attendance${params}`),
   update: (id, data) => apiRequest(`/api/attendance/${id}`, { method: 'PUT', body: data }),
+  getSummary: (month, year) => apiRequest(`/api/attendance/summary?month=${month}&year=${year}`),
 };
 
 // Leave APIs

@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Save, ChevronDown, User, Building2,
-  Mail, Phone, MapPin, CreditCard, Calendar
+  Mail, Phone, MapPin, CreditCard, Calendar, GraduationCap, X, Briefcase, Plus, Trash2, IndianRupee
 } from 'lucide-react';
-import { employees, users, roles as rolesApi } from '../services/api.js';
+import { employees, users, roles as rolesApi, salaryStructures } from '../services/api.js';
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -24,14 +24,18 @@ const designations = [
 // For edit mode, this would be pre-filled from API
 const employmentTypes = ['Full-Time', 'Part-Time', 'Contract', 'Intern'];
 
+const employeeStatuses = ['Active', 'Inactive', 'On Leave', 'Terminated', 'Resigned'];
+
 const emptyForm = {
   firstName: '', lastName: '', email: '', phone: '',
-  employmentType: 'Full-Time',
+  employmentType: 'Full-Time', status: 'Active',
   department: '', designation: '', managerId: '', roleId: '',
   joinDate: '', gender: '', dob: '', maritalStatus: '',
   bloodGroup: '', address: '', city: '', state: '', pincode: '',
   emergencyName: '', emergencyPhone: '', emergencyRelation: '',
   bankName: '', accountNumber: '', ifsc: '', panNumber: '',
+  skills: [],
+  experience: [],
 };
 
 // Mock pre-fill for edit mode
@@ -91,6 +95,11 @@ export default function EmployeeForm() {
   const [allRoles, setAllRoles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [salary, setSalary] = useState({
+    basic: '', hra: '', conveyanceAllowance: '', medicalAllowance: '',
+    specialAllowance: '', bonus: '', otherAllowances: '', effectiveFrom: '',
+  });
+  const [salaryId, setSalaryId] = useState(null);
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = (currentUser.role_name || '').toLowerCase() === 'admin';
@@ -100,6 +109,9 @@ export default function EmployeeForm() {
     if (isAdmin) rolesApi.getAll().then(r => setAllRoles(r?.data || [])).catch(() => {});
     if (isEdit && id) fetchEmployee(id);
   }, [isEdit, id]);
+
+  const updateSalary = (field) => (e) =>
+    setSalary(prev => ({ ...prev, [field]: e.target.value }));
 
   const fetchManagers = async () => {
     try {
@@ -115,11 +127,30 @@ export default function EmployeeForm() {
       const response = await employees.getById(employeeId);
       const d = response?.data || {};
       setUserId(d.user_id || null);
+      // Fetch salary structure
+      if (d.user_id) {
+        try {
+          const salRes = await salaryStructures.getActiveByUser(d.user_id);
+          const s = salRes?.data || salRes;
+          if (s && s.id) {
+            setSalaryId(s.id);
+            setSalary({
+              basic: s.basic || '', hra: s.hra || '',
+              conveyanceAllowance: s.conveyance_allowance || '',
+              medicalAllowance: s.medical_allowance || '',
+              specialAllowance: s.special_allowance || '',
+              bonus: s.bonus || '', otherAllowances: s.other_allowances || '',
+              effectiveFrom: s.effective_from ? s.effective_from.slice(0, 10) : '',
+            });
+          }
+        } catch {}
+      }
       setForm({
         firstName: d.first_name ?? '',
         lastName: d.last_name ?? '',
         email: d.email ?? '',
         phone: d.phone ?? '',
+        status: d.status ?? 'Active',
         department: d.department ?? '',
         designation: d.designation ?? '',
         managerId: d.manager_id ? String(d.manager_id) : '',
@@ -140,6 +171,8 @@ export default function EmployeeForm() {
         accountNumber: d.bank_account_number ?? '',
         ifsc: d.bank_ifsc ?? '',
         panNumber: d.pan_number ?? '',
+        skills: Array.isArray(d.skills) ? d.skills : [],
+        experience: Array.isArray(d.experience) ? d.experience : [],
       });
     } catch (err) {
       setError(err.message || 'Failed to load employee');
@@ -162,6 +195,7 @@ export default function EmployeeForm() {
   });
 
   const toApiPayload = (f) => ({
+    status: f.status || undefined,
     department: f.department || undefined,
     designation: f.designation || undefined,
     managerId: f.managerId ? Number(f.managerId) : undefined,
@@ -176,6 +210,8 @@ export default function EmployeeForm() {
     bankAccountNumber: f.accountNumber || undefined,
     bankName: f.bankName || undefined,
     bankIfsc: f.ifsc || undefined,
+    skills: f.skills && f.skills.length > 0 ? f.skills : undefined,
+    experience: f.experience && f.experience.length > 0 ? f.experience : undefined,
   });
 
   const handleSubmit = async (e) => {
@@ -189,6 +225,19 @@ export default function EmployeeForm() {
           const userUpdate = toUserPayload(form);
           if (form.roleId) userUpdate.roleId = parseInt(form.roleId);
           await users.update(userId, userUpdate);
+        }
+        // Save salary structure
+        if (salary.basic && Number(salary.basic) > 0) {
+          const salPayload = {
+            userId, basic: Number(salary.basic), hra: Number(salary.hra) || 0,
+            conveyanceAllowance: Number(salary.conveyanceAllowance) || 0,
+            medicalAllowance: Number(salary.medicalAllowance) || 0,
+            specialAllowance: Number(salary.specialAllowance) || 0,
+            bonus: Number(salary.bonus) || 0, otherAllowances: Number(salary.otherAllowances) || 0,
+            effectiveFrom: salary.effectiveFrom || new Date().toISOString().split('T')[0],
+          };
+          if (salaryId) await salaryStructures.update(salaryId, salPayload);
+          else await salaryStructures.create(salPayload);
         }
       } else {
         if (!form.email) throw new Error('Email is required.');
@@ -215,7 +264,24 @@ export default function EmployeeForm() {
           bankAccountNumber: form.accountNumber || undefined,
           bankName: form.bankName || undefined,
           bankIfsc: form.ifsc || undefined,
+          skills: form.skills.length > 0 ? form.skills : undefined,
+          experience: form.experience.length > 0 ? form.experience : undefined,
         });
+        // Save salary for new employee
+        if (salary.basic && Number(salary.basic) > 0) {
+          const newRes = await employees.getAll();
+          const allEmps = newRes?.data?.employees ?? newRes?.data ?? [];
+          const created = allEmps.find(emp => emp.email === form.email);
+          if (created?.user_id) {
+            await salaryStructures.create({
+              userId: created.user_id, basic: Number(salary.basic),
+              hra: Number(salary.hra) || 0, conveyanceAllowance: Number(salary.conveyanceAllowance) || 0,
+              medicalAllowance: Number(salary.medicalAllowance) || 0, specialAllowance: Number(salary.specialAllowance) || 0,
+              bonus: Number(salary.bonus) || 0, otherAllowances: Number(salary.otherAllowances) || 0,
+              effectiveFrom: salary.effectiveFrom || form.joinDate || new Date().toISOString().split('T')[0],
+            });
+          }
+        }
       }
       navigate('/app/employees');
     } catch (err) {
@@ -280,6 +346,22 @@ export default function EmployeeForm() {
 
           {/* Work Info */}
           <FormSection title="Work Information" icon={Building2}>
+            {isEdit && (
+              <FormField label="Status" id="status" required>
+                <div className="relative">
+                  <select
+                    id="status"
+                    value={form.status}
+                    onChange={update('status')}
+                    className="input-field appearance-none pr-10 cursor-pointer"
+                    required
+                  >
+                    {employeeStatuses.map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+              </FormField>
+            )}
             <FormField label="Employment Type" id="employmentType" required>
               <div className="relative">
                 <select
@@ -557,6 +639,8 @@ export default function EmployeeForm() {
                 placeholder="e.g. HDFC0001234"
                 className="input-field uppercase"
                 maxLength={11}
+                pattern="[A-Z]{4}0[A-Z0-9]{6}"
+                title="IFSC format: 4 letters, 0, 6 alphanumeric (e.g. HDFC0001234)"
               />
             </FormField>
             <FormField label="PAN Number" id="panNumber">
@@ -568,8 +652,289 @@ export default function EmployeeForm() {
                 placeholder="e.g. ABCPS1234K"
                 className="input-field uppercase"
                 maxLength={10}
+                pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+                title="PAN format: 5 letters, 4 digits, 1 letter (e.g. ABCPS1234K)"
               />
             </FormField>
+          </FormSection>
+
+          {/* Skills & Expertise */}
+          <FormSection title="Skills & Expertise" icon={GraduationCap}>
+            <div className="md:col-span-2">
+              <label className="text-caption text-ink mb-1.5 block">Skills</label>
+              <div
+                className="input-field flex flex-wrap items-center gap-1.5 min-h-[42px] cursor-text py-1.5"
+                onClick={(e) => { e.currentTarget.querySelector('input')?.focus(); }}
+              >
+                {form.skills.map((skill, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-ink text-on-primary rounded-full text-caption font-medium whitespace-nowrap">
+                    {skill}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setForm(prev => ({ ...prev, skills: prev.skills.filter((_, idx) => idx !== i) })); }}
+                      className="hover:text-white/60 transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  placeholder={form.skills.length === 0 ? "Type a skill and press Space" : ""}
+                  className="bg-transparent border-none outline-none text-body-sm text-ink placeholder:text-muted flex-1 min-w-[120px] py-0.5"
+                  onKeyDown={(e) => {
+                    const val = e.target.value.trim();
+                    if ((e.key === ' ' || e.key === 'Enter' || e.key === ',') && val) {
+                      e.preventDefault();
+                      if (!form.skills.includes(val)) {
+                        setForm(prev => ({ ...prev, skills: [...prev.skills, val] }));
+                      }
+                      e.target.value = '';
+                    }
+                    if (e.key === 'Backspace' && !e.target.value && form.skills.length > 0) {
+                      setForm(prev => ({ ...prev, skills: prev.skills.slice(0, -1) }));
+                    }
+                  }}
+                />
+              </div>
+              <p className="text-caption text-muted mt-1.5">Press Space, Enter, or comma to add a skill. Backspace to remove.</p>
+            </div>
+          </FormSection>
+
+          {/* Experience */}
+          <FormSection title="Work Experience" icon={Briefcase}>
+            <div className="md:col-span-2 flex flex-col gap-4">
+              {form.experience.map((exp, i) => (
+                <div key={i} className="border border-hairline rounded-lg p-4 relative bg-surface-soft/30">
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, experience: prev.experience.filter((_, idx) => idx !== i) }))}
+                    className="absolute top-3 right-3 p-1 text-muted hover:text-error transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-caption text-ink">Company *</label>
+                      <input
+                        type="text"
+                        value={exp.company}
+                        onChange={(e) => {
+                          const updated = [...form.experience];
+                          updated[i] = { ...updated[i], company: e.target.value };
+                          setForm(prev => ({ ...prev, experience: updated }));
+                        }}
+                        placeholder="Company name"
+                        className="input-field"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-caption text-ink">Role / Title *</label>
+                      <input
+                        type="text"
+                        value={exp.role}
+                        onChange={(e) => {
+                          const updated = [...form.experience];
+                          updated[i] = { ...updated[i], role: e.target.value };
+                          setForm(prev => ({ ...prev, experience: updated }));
+                        }}
+                        placeholder="Job title"
+                        className="input-field"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-caption text-ink">From</label>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-[2]">
+                          <select
+                            value={exp.from ? parseInt(exp.from.split('-')[1]) : ''}
+                            onChange={(e) => {
+                              const updated = [...form.experience];
+                              const y = exp.from ? exp.from.split('-')[0] : String(new Date().getFullYear());
+                              updated[i] = { ...updated[i], from: `${y}-${String(e.target.value).padStart(2, '0')}` };
+                              setForm(prev => ({ ...prev, experience: updated }));
+                            }}
+                            className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                          >
+                            <option value="" disabled>Month</option>
+                            {MONTHS.map((m, idx) => <option key={m} value={idx + 1}>{m}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                        </div>
+                        <div className="relative flex-1">
+                          <select
+                            value={exp.from ? parseInt(exp.from.split('-')[0]) : ''}
+                            onChange={(e) => {
+                              const updated = [...form.experience];
+                              const m = exp.from ? exp.from.split('-')[1] : '01';
+                              updated[i] = { ...updated[i], from: `${e.target.value}-${m}` };
+                              setForm(prev => ({ ...prev, experience: updated }));
+                            }}
+                            className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                          >
+                            <option value="" disabled>Year</option>
+                            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-caption text-ink">To</label>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-[2]">
+                          <select
+                            value={exp.to ? parseInt(exp.to.split('-')[1]) : ''}
+                            onChange={(e) => {
+                              const updated = [...form.experience];
+                              const y = exp.to ? exp.to.split('-')[0] : String(new Date().getFullYear());
+                              updated[i] = { ...updated[i], to: `${y}-${String(e.target.value).padStart(2, '0')}` };
+                              setForm(prev => ({ ...prev, experience: updated }));
+                            }}
+                            className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                          >
+                            <option value="">Present</option>
+                            {MONTHS.map((m, idx) => <option key={m} value={idx + 1}>{m}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                        </div>
+                        <div className="relative flex-1">
+                          <select
+                            value={exp.to ? parseInt(exp.to.split('-')[0]) : ''}
+                            onChange={(e) => {
+                              const updated = [...form.experience];
+                              const m = exp.to ? exp.to.split('-')[1] : '01';
+                              updated[i] = { ...updated[i], to: e.target.value ? `${e.target.value}-${m}` : '' };
+                              setForm(prev => ({ ...prev, experience: updated }));
+                            }}
+                            className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                          >
+                            <option value="">Year</option>
+                            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                          </select>
+                          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 mt-3">
+                    <label className="text-caption text-ink">Description</label>
+                    <textarea
+                      value={exp.description || ''}
+                      onChange={(e) => {
+                        const updated = [...form.experience];
+                        updated[i] = { ...updated[i], description: e.target.value };
+                        setForm(prev => ({ ...prev, experience: updated }));
+                      }}
+                      rows={2}
+                      placeholder="Brief description of your role"
+                      className="input-field resize-none"
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, experience: [...prev.experience, { company: '', role: '', from: '', to: '', description: '' }] }))}
+                className="btn-secondary inline-flex items-center gap-2 text-body-sm w-fit"
+              >
+                <Plus size={14} />
+                Add Experience
+              </button>
+            </div>
+          </FormSection>
+
+          {/* Salary Structure */}
+          <FormSection title="Salary Structure" icon={IndianRupee}>
+            <FormField
+              label="Basic Salary" id="basic" type="number" placeholder="e.g. 30000"
+              value={salary.basic} onChange={updateSalary('basic')} required
+            />
+            <FormField
+              label="HRA" id="hra" type="number" placeholder="e.g. 12000"
+              value={salary.hra} onChange={updateSalary('hra')}
+            />
+            <FormField
+              label="Conveyance Allowance" id="conveyanceAllowance" type="number" placeholder="0"
+              value={salary.conveyanceAllowance} onChange={updateSalary('conveyanceAllowance')}
+            />
+            <FormField
+              label="Medical Allowance" id="medicalAllowance" type="number" placeholder="0"
+              value={salary.medicalAllowance} onChange={updateSalary('medicalAllowance')}
+            />
+            <FormField
+              label="Special Allowance" id="specialAllowance" type="number" placeholder="0"
+              value={salary.specialAllowance} onChange={updateSalary('specialAllowance')}
+            />
+            <FormField
+              label="Bonus" id="bonus" type="number" placeholder="0"
+              value={salary.bonus} onChange={updateSalary('bonus')}
+            />
+            <FormField
+              label="Other Allowances" id="otherAllowances" type="number" placeholder="0"
+              value={salary.otherAllowances} onChange={updateSalary('otherAllowances')}
+            />
+            <FormField label="Effective From" id="effectiveFrom">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <select
+                    value={salary.effectiveFrom ? parseInt(salary.effectiveFrom.split('-')[2]) : ''}
+                    onChange={(e) => {
+                      const [y, m] = (salary.effectiveFrom || `${new Date().getFullYear()}-01-01`).split('-');
+                      setSalary(prev => ({...prev, effectiveFrom: `${y}-${m}-${String(e.target.value).padStart(2,'0')}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Day</option>
+                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+                <div className="relative flex-[2]">
+                  <select
+                    value={salary.effectiveFrom ? parseInt(salary.effectiveFrom.split('-')[1]) : ''}
+                    onChange={(e) => {
+                      const [y, , d] = (salary.effectiveFrom || `${new Date().getFullYear()}-01-01`).split('-');
+                      setSalary(prev => ({...prev, effectiveFrom: `${y}-${String(e.target.value).padStart(2,'0')}-${d}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Month</option>
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+                <div className="relative flex-1">
+                  <select
+                    value={salary.effectiveFrom ? parseInt(salary.effectiveFrom.split('-')[0]) : ''}
+                    onChange={(e) => {
+                      const [, m, d] = (salary.effectiveFrom || `${new Date().getFullYear()}-01-01`).split('-');
+                      setSalary(prev => ({...prev, effectiveFrom: `${e.target.value}-${m}-${d}`}));
+                    }}
+                    className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer"
+                  >
+                    <option value="" disabled>Year</option>
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+              </div>
+            </FormField>
+            {(salary.basic || salary.hra || salary.conveyanceAllowance || salary.medicalAllowance || salary.specialAllowance || salary.bonus || salary.otherAllowances) && (
+              <div className="md:col-span-2 p-4 bg-surface-soft rounded-lg flex items-center justify-between">
+                <span className="text-body-sm font-medium text-ink">Gross Salary</span>
+                <span className="text-title-sm text-ink font-cal">
+                  ₹{(
+                    Number(salary.basic || 0) + Number(salary.hra || 0) +
+                    Number(salary.conveyanceAllowance || 0) + Number(salary.medicalAllowance || 0) +
+                    Number(salary.specialAllowance || 0) + Number(salary.bonus || 0) +
+                    Number(salary.otherAllowances || 0)
+                  ).toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
           </FormSection>
         </div>
 

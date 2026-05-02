@@ -2,15 +2,22 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   TrendingUp, Users, ArrowRight,
-  CheckCircle, AlertCircle, Play,
+  CheckCircle, AlertCircle, Play, Download, ChevronDown, Calendar
 } from 'lucide-react';
 import { payroll, salaryStructures } from '../services/api.js';
+
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
 
 export default function PayrollOverview() {
   const [payrollData, setPayrollData] = useState([]);
   const [salaryData, setSalaryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filterMonth, setFilterMonth] = useState(0); // 0 = All
+  const [filterYear, setFilterYear] = useState(0);   // 0 = All
 
   useEffect(() => {
     fetchPayrollData();
@@ -34,9 +41,16 @@ export default function PayrollOverview() {
     }
   };
 
+  // Filter payroll data by month/year
+  const filteredPayroll = payrollData.filter((r) => {
+    if (filterMonth && r.month !== filterMonth) return false;
+    if (filterYear && r.year !== filterYear) return false;
+    return true;
+  });
+
   // Group payroll records by month label
   const historyMap = {};
-  payrollData.forEach((r) => {
+  filteredPayroll.forEach((r) => {
     const key = r.month && r.year ? `${new Date(0, r.month - 1).toLocaleString('en-IN', { month: 'long' })} ${r.year}` : 'Unknown';
     if (!historyMap[key]) historyMap[key] = { key, count: 0, status: r.status, runDate: r.processed_at || r.created_at };
     historyMap[key].count++;
@@ -52,11 +66,28 @@ export default function PayrollOverview() {
     return { range: b.range, count, percentage: Math.round((count / maxCount) * 100) };
   });
 
-  // Calculate totals from actual payroll records
-  const totalGross = payrollData.reduce((s, r) => s + Number(r.gross_salary || 0), 0);
-  const totalDeductions = payrollData.reduce((s, r) => s + Number(r.total_deductions || 0), 0);
-  const totalNet = payrollData.reduce((s, r) => s + Number(r.net_salary || 0), 0);
-  const totalProcessed = new Set(payrollData.map((r) => r.user_id)).size;
+  // Calculate totals from filtered payroll records
+  const totalGross = filteredPayroll.reduce((s, r) => s + Number(r.gross_salary || 0), 0);
+  const totalDeductions = filteredPayroll.reduce((s, r) => s + Number(r.total_deductions || 0), 0);
+  const totalNet = filteredPayroll.reduce((s, r) => s + Number(r.net_salary || 0), 0);
+  const totalProcessed = new Set(filteredPayroll.map((r) => r.user_id)).size;
+
+  const exportPayrollCSV = () => {
+    const rows = [['Employee','Month','Year','Gross','Deductions','Net','Status']];
+    filteredPayroll.forEach((r) => {
+      rows.push([
+        `${r.first_name || ''} ${r.last_name || ''}`.trim() || r.user_id,
+        MONTHS[(r.month || 1) - 1], r.year,
+        r.gross_salary, r.total_deductions, r.net_salary, r.status || 'Processed',
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `payroll${filterMonth ? '-' + MONTHS[filterMonth-1] : ''}${filterYear ? '-' + filterYear : ''}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
 
   const fmt = (n) => n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${n.toLocaleString('en-IN')}`;
 
@@ -95,10 +126,52 @@ export default function PayrollOverview() {
             Process salaries, track disbursements, and manage payroll operations.
           </p>
         </div>
-        <Link to="/app/payroll/process" className="btn-primary inline-flex items-center gap-2">
-          <Play size={16} />
-          Run Payroll
-        </Link>
+        <div className="flex items-center gap-2">
+          <button onClick={exportPayrollCSV} className="btn-secondary inline-flex items-center gap-2" disabled={filteredPayroll.length === 0}>
+            <Download size={16} />
+            Export CSV
+          </button>
+          <Link to="/app/payroll/process" className="btn-primary inline-flex items-center gap-2">
+            <Play size={16} />
+            Run Payroll
+          </Link>
+        </div>
+      </div>
+
+      {/* Month/Year Filter */}
+      <div className="flex items-center gap-3 mb-6 bg-canvas border border-hairline rounded-lg px-4 py-3">
+        <Calendar size={16} className="text-muted" />
+        <span className="text-body-sm text-muted">Filter:</span>
+        <div className="relative">
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(Number(e.target.value))}
+            className="input-field py-1.5 pl-3 pr-8 text-body-sm appearance-none cursor-pointer min-w-[130px]"
+          >
+            <option value={0}>All Months</option>
+            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(Number(e.target.value))}
+            className="input-field py-1.5 pl-3 pr-8 text-body-sm appearance-none cursor-pointer min-w-[90px]"
+          >
+            <option value={0}>All Years</option>
+            {[2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+        </div>
+        {(filterMonth || filterYear) && (
+          <button
+            onClick={() => { setFilterMonth(0); setFilterYear(0); }}
+            className="text-caption text-muted hover:text-ink transition-colors"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Stats */}

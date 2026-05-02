@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   Search, ChevronDown, ChevronLeft, ChevronRight,
-  Calendar, Download
+  Calendar, Download, AlertCircle, Filter
 } from 'lucide-react';
 import { attendance } from '../services/api.js';
 import { useAuth } from '../hooks/useAuth.jsx';
 
-const months = ['January', 'February', 'March', 'April', 'May'];
 const departments = ['All', 'Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 
 const statusBadge = {
@@ -29,6 +28,7 @@ export default function AttendanceOverview() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [updating, setUpdating] = useState(null);
 
@@ -65,19 +65,40 @@ export default function AttendanceOverview() {
     }
   };
 
+  const lateCount = attendanceData.filter(a => Number(a.late_minutes) > 0).length;
+
   const summaryCards = [
     { label: 'Present', value: attendanceData.filter(a => a.status === 'Present').length, color: 'text-success' },
     { label: 'Absent', value: attendanceData.filter(a => a.status === 'Absent').length, color: 'text-error' },
     { label: 'On Leave', value: attendanceData.filter(a => a.status === 'Leave').length, color: 'text-[#8b5cf6]' },
     { label: 'Half Day', value: attendanceData.filter(a => a.status === 'Half-Day').length, color: 'text-warning' },
+    { label: 'Late Arrivals', value: lateCount, color: 'text-orange-500' },
   ];
 
   const filtered = attendanceData.filter((rec) => {
     const fullName = `${rec.first_name || ''} ${rec.last_name || ''}`.toLowerCase();
     const matchSearch = !search || fullName.includes(search.toLowerCase()) || rec.email?.toLowerCase().includes(search.toLowerCase());
     const matchDept = deptFilter === 'All' || rec.department === deptFilter;
-    return matchSearch && matchDept;
+    const matchStatus = statusFilter === 'All' || rec.status === statusFilter;
+    return matchSearch && matchDept && matchStatus;
   });
+
+  const exportCSV = () => {
+    const rows = [['Employee','Department','Date','Check In','Check Out','Hours','Late (min)','OT (min)','Status']];
+    filtered.forEach(rec => {
+      rows.push([
+        `${rec.first_name || ''} ${rec.last_name || ''}`.trim(),
+        rec.department || '', selectedDate, fmtTime(rec.check_in), fmtTime(rec.check_out),
+        rec.work_hours ? `${Number(rec.work_hours).toFixed(1)}` : '',
+        rec.late_minutes || 0, rec.overtime_minutes || 0, rec.status || '',
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `attendance-${selectedDate}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const fmtTime = (t) => {
     if (!t) return '—';
@@ -116,14 +137,14 @@ export default function AttendanceOverview() {
             Track and manage employee attendance across departments.
           </p>
         </div>
-        <button className="btn-secondary inline-flex items-center gap-2">
+        <button onClick={exportCSV} className="btn-secondary inline-flex items-center gap-2" disabled={filtered.length === 0}>
           <Download size={16} />
-          Export
+          Export CSV
         </button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         {summaryCards.map((card) => (
           <div key={card.label} className="bg-canvas border border-hairline rounded-lg p-4 text-center">
             <p className={`text-display-sm font-cal ${card.color}`}>{card.value}</p>
@@ -166,6 +187,25 @@ export default function AttendanceOverview() {
             </select>
             <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
           </div>
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input-field py-1.5 pr-8 text-body-sm appearance-none cursor-pointer"
+            >
+              <option value="All">All Status</option>
+              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+          </div>
+          {(deptFilter !== 'All' || statusFilter !== 'All') && (
+            <button
+              onClick={() => { setDeptFilter('All'); setStatusFilter('All'); }}
+              className="text-caption text-muted hover:text-ink transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -180,6 +220,8 @@ export default function AttendanceOverview() {
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Check In</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Check Out</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Hours</th>
+                <th className="text-left px-5 py-3 text-caption text-muted font-medium">Late</th>
+                <th className="text-left px-5 py-3 text-caption text-muted font-medium">OT</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Status</th>
                 {isHR && <th className="text-left px-5 py-3 text-caption text-muted font-medium">Override</th>}
               </tr>
@@ -187,7 +229,7 @@ export default function AttendanceOverview() {
             <tbody className="divide-y divide-hairline">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={isHR ? 7 : 6} className="px-5 py-10 text-center text-body-sm text-muted">No attendance records found.</td>
+                  <td colSpan={isHR ? 9 : 8} className="px-5 py-10 text-center text-body-sm text-muted">No attendance records found.</td>
                 </tr>
               ) : filtered.map((rec) => (
                 <tr key={rec.id} className="hover:bg-surface-soft/50 transition-colors">
@@ -201,9 +243,14 @@ export default function AttendanceOverview() {
                   </td>
                   <td className="px-5 py-3.5 text-body-sm text-muted">{rec.department || '—'}</td>
                   <td className="px-5 py-3.5">
-                    <span className={`text-body-sm ${!rec.check_in ? 'text-muted' : 'text-ink'}`}>
-                      {fmtTime(rec.check_in)}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-body-sm ${!rec.check_in ? 'text-muted' : 'text-ink'}`}>
+                        {fmtTime(rec.check_in)}
+                      </span>
+                      {Number(rec.late_minutes) > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded font-medium">LATE</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`text-body-sm ${!rec.check_out ? 'text-muted' : 'text-ink'}`}>
@@ -213,6 +260,16 @@ export default function AttendanceOverview() {
                   <td className="px-5 py-3.5">
                     <span className={`text-body-sm font-medium ${!rec.work_hours ? 'text-muted' : 'text-ink'}`}>
                       {rec.work_hours ? `${Number(rec.work_hours).toFixed(1)}h` : '—'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className={`text-body-sm ${Number(rec.late_minutes) > 0 ? 'text-orange-500 font-medium' : 'text-muted'}`}>
+                      {Number(rec.late_minutes) > 0 ? `${rec.late_minutes}m` : '—'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className={`text-body-sm ${Number(rec.overtime_minutes) > 0 ? 'text-blue-500 font-medium' : 'text-muted'}`}>
+                      {Number(rec.overtime_minutes) > 0 ? `${rec.overtime_minutes}m` : '—'}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">

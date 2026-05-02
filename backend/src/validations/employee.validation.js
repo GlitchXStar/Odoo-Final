@@ -21,6 +21,14 @@ const createEmployeeSchema = Joi.object({
   bankAccountNumber: Joi.string().max(50).allow(null, ''),
   bankName: Joi.string().max(100).allow(null, ''),
   bankIfsc: Joi.string().max(20).allow(null, ''),
+  skills: Joi.array().items(Joi.string().max(100)).allow(null),
+  experience: Joi.array().items(Joi.object({
+    company: Joi.string().max(200).required(),
+    role: Joi.string().max(200).required(),
+    from: Joi.string().max(20).allow('', null),
+    to: Joi.string().max(20).allow('', null),
+    description: Joi.string().max(500).allow('', null),
+  })).allow(null),
 });
 
 const updateEmployeeSchema = Joi.object({
@@ -44,6 +52,14 @@ const updateEmployeeSchema = Joi.object({
   bankIfsc: Joi.string().max(20),
   dateOfLeaving: Joi.date().iso().allow(null),
   profilePhotoUrl: Joi.string().max(500),
+  skills: Joi.array().items(Joi.string().max(100)).allow(null),
+  experience: Joi.array().items(Joi.object({
+    company: Joi.string().max(200).required(),
+    role: Joi.string().max(200).required(),
+    from: Joi.string().max(20).allow('', null),
+    to: Joi.string().max(20).allow('', null),
+    description: Joi.string().max(500).allow('', null),
+  })).allow(null),
 }).min(1);
 
 module.exports = { createEmployeeSchema, updateEmployeeSchema };

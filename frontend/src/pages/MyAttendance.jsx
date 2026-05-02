@@ -4,6 +4,7 @@ import {
   ChevronLeft, ChevronRight, ArrowRight
 } from 'lucide-react';
 import { attendance } from '../services/api.js';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 
 const statusBadge = {
@@ -43,6 +44,7 @@ function fmtDay(ts) {
 }
 
 export default function MyAttendance() {
+  const { user } = useAuth();
   const [todayRecord, setTodayRecord] = useState(null);
   const [allLogs, setAllLogs] = useState([]);
   const [viewMonth, setViewMonth] = useState(() => {
@@ -57,7 +59,7 @@ export default function MyAttendance() {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const response = await attendance.getAll();
+      const response = await attendance.getAll(`?userId=${user?.id}`);
       const logs = Array.isArray(response?.data?.attendance) ? response.data.attendance : [];
       const todayIso = toLocalDate(new Date());
       const rec = logs.find(l => l.date && toLocalDate(l.date) === todayIso);
@@ -94,8 +96,12 @@ export default function MyAttendance() {
     return m === viewMonth.month && y === viewMonth.year;
   });
 
+  const presentLogs = monthLogs.filter(l => l.status === 'Present');
+  const totalHours = presentLogs.reduce((s, l) => s + Number(l.work_hours || 0), 0);
+  const avgHours = presentLogs.length > 0 ? (totalHours / presentLogs.length).toFixed(1) : '0';
+
   const monthlySummary = {
-    present:      monthLogs.filter(l => l.status === 'Present').length,
+    present:      presentLogs.length,
     absent:       monthLogs.filter(l => l.status === 'Absent').length,
     halfDay:      monthLogs.filter(l => l.status === 'Half-Day').length,
     leave:        monthLogs.filter(l => l.status === 'Leave').length,
@@ -201,9 +207,12 @@ export default function MyAttendance() {
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-hairline flex items-center justify-between">
+          <div className="mt-4 pt-4 border-t border-hairline flex flex-wrap items-center gap-x-6 gap-y-1">
             <span className="text-body-sm text-muted">
-              Total Working Days: <span className="font-medium text-ink">{monthlySummary.totalWorking}</span>
+              Total Days: <span className="font-medium text-ink">{monthlySummary.totalWorking}</span>
+            </span>
+            <span className="text-body-sm text-muted">
+              Avg Hours: <span className="font-medium text-ink">{avgHours}h</span>
             </span>
             <span className="text-body-sm text-muted">
               Attendance Rate:{' '}
@@ -238,20 +247,42 @@ export default function MyAttendance() {
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Check In</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Check Out</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Hours</th>
+                <th className="text-left px-5 py-3 text-caption text-muted font-medium">Late</th>
+                <th className="text-left px-5 py-3 text-caption text-muted font-medium">OT</th>
                 <th className="text-left px-5 py-3 text-caption text-muted font-medium">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
               {monthLogs.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-body-sm text-muted">No attendance records for this month.</td></tr>
+                <tr><td colSpan={8} className="px-5 py-8 text-center text-body-sm text-muted">No attendance records for this month.</td></tr>
               ) : monthLogs.map((log, i) => (
-                <tr key={i} className="hover:bg-surface-soft/50 transition-colors">
+                <tr key={i} className={`hover:bg-surface-soft/50 transition-colors ${(() => { const d = new Date(log.date); const day = d.getDay(); return (day === 0 || day === 6) ? 'bg-surface-soft/30' : ''; })()}`}>
                   <td className="px-5 py-3.5 text-body-sm font-medium text-ink">{fmtDate(log.date)}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-muted">{fmtDay(log.date)}</td>
-                  <td className="px-5 py-3.5 text-body-sm text-ink">{fmtTime(log.check_in)}</td>
+                  <td className="px-5 py-3.5 text-body-sm text-muted">
+                    {fmtDay(log.date)}
+                    {(() => { const d = new Date(log.date); return (d.getDay() === 0 || d.getDay() === 6) ? ' 🗓' : ''; })()}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-body-sm text-ink">{fmtTime(log.check_in)}</span>
+                      {Number(log.late_minutes) > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded font-medium">LATE</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-5 py-3.5 text-body-sm text-ink">{fmtTime(log.check_out)}</td>
                   <td className="px-5 py-3.5 text-body-sm font-medium text-ink">
                     {log.work_hours ? `${log.work_hours}h` : '—'}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className={`text-body-sm ${Number(log.late_minutes) > 0 ? 'text-orange-500 font-medium' : 'text-muted'}`}>
+                      {Number(log.late_minutes) > 0 ? `${log.late_minutes}m` : '—'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className={`text-body-sm ${Number(log.overtime_minutes) > 0 ? 'text-blue-500 font-medium' : 'text-muted'}`}>
+                      {Number(log.overtime_minutes) > 0 ? `${log.overtime_minutes}m` : '—'}
+                    </span>
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`badge badge-${(log.status || '').toLowerCase().replace('-', '')}`}>
