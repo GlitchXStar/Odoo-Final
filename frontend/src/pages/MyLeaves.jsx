@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  CalendarOff, Plus, ArrowRight, Calendar
+  CalendarOff, Plus, ArrowRight, Calendar, Filter
 } from 'lucide-react';
 import { leaves, leaveBalances } from '../services/api.js';
 
 const statusBadge = { pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-rejected' };
 const statusLabel = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' };
+const STATUS_FILTERS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
 
 export default function MyLeaves() {
   const [myLeaves, setMyLeaves] = useState([]);
   const [leaveBalance, setLeaveBalance] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
 
   useEffect(() => {
     fetchMyLeaves();
@@ -22,7 +24,7 @@ export default function MyLeaves() {
     try {
       setLoading(true);
       const [leavesRes, balancesRes] = await Promise.all([
-        leaves.getAll(),
+        leaves.getMine(),
         leaveBalances.getAll()
       ]);
       const leavesData = leavesRes?.data?.leaves ?? leavesRes?.data ?? [];
@@ -107,58 +109,110 @@ export default function MyLeaves() {
 
       {/* Leave History */}
       <div className="bg-canvas border border-hairline rounded-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-hairline">
+        <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
           <h3 className="text-title-sm text-ink">Leave History</h3>
+          <span className="text-caption text-muted">{myLeaves.length} total</span>
         </div>
-        <div className="divide-y divide-hairline">
-          {myLeaves.length === 0 ? (
-            <div className="px-5 py-12 text-center">
-              <CalendarOff size={32} className="text-muted mx-auto mb-3" />
-              <p className="text-body-sm text-muted">No leave requests yet.</p>
-              <Link to="/app/time-off/apply" className="text-body-sm text-primary hover:underline mt-2 inline-block">
-                Apply for your first leave
-              </Link>
-            </div>
-          ) : myLeaves.map((leave) => {
-            const startDate = new Date(leave.start_date);
-            const endDate = new Date(leave.end_date);
-            const days = Number(leave.total_days) || 1;
-            const status = (leave.status || 'Pending').toLowerCase();
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1 px-5 py-2 border-b border-hairline bg-surface-soft/50 overflow-x-auto">
+          {STATUS_FILTERS.map(tab => {
+            const count = tab === 'All' ? myLeaves.length : myLeaves.filter(l => (l.status || '').toLowerCase() === tab.toLowerCase()).length;
             return (
-              <div key={leave.id} className="px-5 py-4 hover:bg-surface-soft/30 transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4 flex-1">
-                    <div className="w-10 h-10 rounded-lg bg-surface-card flex items-center justify-center flex-shrink-0">
-                      <CalendarOff size={18} className="text-muted" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-body-sm font-medium text-ink">{leave.leave_type_name || 'Leave'}</p>
-                        <span className={`badge ${statusBadge[status] || 'badge-pending'}`}>
-                          {statusLabel[status] || leave.status}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-caption text-muted mb-1">
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar size={12} />
-                          {startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          {days > 1 && ` → ${endDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-                        </span>
-                        <span>·</span>
-                        <span>{days} day{days > 1 ? 's' : ''}</span>
-                      </div>
-                      {leave.reason && (
-                        <p className="text-caption text-muted line-clamp-2">{leave.reason}</p>
-                      )}
-                      <p className="text-caption text-muted/60 mt-1">
-                        Applied on {new Date(leave.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <button
+                key={tab}
+                onClick={() => setStatusFilter(tab)}
+                className={`px-3 py-1.5 rounded-md text-caption font-medium transition-all whitespace-nowrap ${
+                  statusFilter === tab
+                    ? 'bg-canvas text-ink shadow-soft'
+                    : 'text-muted hover:text-ink'
+                }`}
+              >
+                {tab} <span className="text-muted ml-0.5">({count})</span>
+              </button>
             );
           })}
+        </div>
+
+        {/* Table Header */}
+        <div className="hidden sm:grid grid-cols-[1fr_100px_80px_100px] gap-4 px-5 py-2.5 border-b border-hairline bg-surface-soft/30">
+          <span className="text-caption text-muted font-medium">Leave Details</span>
+          <span className="text-caption text-muted font-medium text-center">Duration</span>
+          <span className="text-caption text-muted font-medium text-center">Status</span>
+          <span className="text-caption text-muted font-medium text-right">Applied On</span>
+        </div>
+
+        <div className="divide-y divide-hairline">
+          {(() => {
+            const filtered = statusFilter === 'All'
+              ? myLeaves
+              : myLeaves.filter(l => (l.status || '').toLowerCase() === statusFilter.toLowerCase());
+
+            if (filtered.length === 0) {
+              return (
+                <div className="px-5 py-12 text-center">
+                  <CalendarOff size={32} className="text-muted mx-auto mb-3" />
+                  <p className="text-body-sm text-muted">
+                    {myLeaves.length === 0 ? 'No leave requests yet.' : `No ${statusFilter.toLowerCase()} leaves.`}
+                  </p>
+                  {myLeaves.length === 0 && (
+                    <Link to="/app/time-off/apply" className="text-body-sm text-primary hover:underline mt-2 inline-block">
+                      Apply for your first leave
+                    </Link>
+                  )}
+                </div>
+              );
+            }
+
+            return filtered.map((leave) => {
+              const startDate = new Date(leave.start_date);
+              const endDate = new Date(leave.end_date);
+              const days = Number(leave.total_days) || 1;
+              const status = (leave.status || 'Pending').toLowerCase();
+              return (
+                <div key={leave.id} className="px-5 py-4 hover:bg-surface-soft/30 transition-colors grid grid-cols-1 sm:grid-cols-[1fr_100px_80px_100px] gap-3 sm:gap-4 items-center">
+                  {/* Leave Details */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-surface-card flex items-center justify-center flex-shrink-0">
+                      <CalendarOff size={16} className="text-muted" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-body-sm font-medium text-ink truncate">{leave.leave_type_name || 'Leave'}</p>
+                      <div className="flex items-center gap-1.5 text-caption text-muted">
+                        <Calendar size={11} />
+                        <span>
+                          {startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                          {days > 1 && ` → ${endDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
+                        </span>
+                      </div>
+                      {leave.reason && (
+                        <p className="text-caption text-muted/70 truncate mt-0.5">{leave.reason}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Duration */}
+                  <div className="text-center">
+                    <p className="text-body-sm font-medium text-ink">{days} day{days > 1 ? 's' : ''}</p>
+                  </div>
+
+                  {/* Status */}
+                  <div className="text-center">
+                    <span className={`badge ${statusBadge[status] || 'badge-pending'}`}>
+                      {statusLabel[status] || leave.status}
+                    </span>
+                  </div>
+
+                  {/* Applied On */}
+                  <div className="text-right">
+                    <p className="text-caption text-muted">
+                      {new Date(leave.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
     </div>

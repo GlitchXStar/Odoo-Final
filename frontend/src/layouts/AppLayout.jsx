@@ -13,27 +13,37 @@ const PAYROLL_ROLES = ['admin', 'payroll officer'];
 
 function getNavItems(role) {
   const r = (role || '').toLowerCase();
-  const isAdmin    = ADMIN_ROLES.includes(r);
-  const isHR       = HR_ROLES.includes(r);
-  const isPayroll  = PAYROLL_ROLES.includes(r);
-  const isEmployee = !isAdmin;
+  const isAdminExact = r === 'admin';
+  const isHR         = r === 'hr officer';
+  const isPayroll    = r === 'payroll officer';
+  const isManagement = isAdminExact || isHR || isPayroll;
+  const isEmployee   = !isManagement;
+
+  // Employees & HR & Payroll who are NOT Admin or HR see "My" pages
+  const canSeeEmployees  = isAdminExact || isHR;
+  const canSeeAttendance = isAdminExact || isHR;
+  const canSeeTimeOff    = isAdminExact || isHR;
+  const canSeePayroll    = isAdminExact || isPayroll;
+  const canSeeReports    = isAdminExact;
 
   const main = [
-    { to: '/app/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
-    ...(isAdmin ? [{ to: '/app/employees', icon: Users, label: 'Employees' }] : []),
-    isAdmin
-      ? { to: '/app/attendance', icon: CalendarDays,    label: 'Attendance' }
-      : { to: '/app/attendance/me', icon: CalendarDays, label: 'My Attendance' },
-    isAdmin
-      ? { to: '/app/time-off',   icon: CalendarOff,     label: 'Time Off' }
-      : { to: '/app/time-off/me', icon: CalendarOff,    label: 'My Leaves' },
-    ...(isPayroll ? [{ to: '/app/payroll', icon: Wallet, label: 'Payroll' }] : []),
-    ...(isEmployee ? [{ to: '/app/payroll/my-payslip', icon: Wallet, label: 'My Payslip' }] : []),
-    ...(isAdmin ? [{ to: '/app/reports', icon: BarChart3, label: 'Reports' }] : []),
+    { to: '/app/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    ...(canSeeEmployees  ? [{ to: '/app/employees', icon: Users, label: 'Employees' }] : []),
+    // Admin views for attendance/time-off
+    ...(canSeeAttendance ? [{ to: '/app/attendance', icon: CalendarDays, label: 'Attendance' }] : []),
+    ...(canSeeTimeOff    ? [{ to: '/app/time-off', icon: CalendarOff, label: 'Time Off' }] : []),
+    // Personal pages — everyone except Admin gets these
+    ...(!isAdminExact ? [
+      { to: '/app/attendance/me', icon: CalendarDays, label: 'My Attendance' },
+      { to: '/app/time-off/me', icon: CalendarOff, label: 'My Leaves' },
+    ] : []),
+    ...(canSeePayroll ? [{ to: '/app/payroll', icon: Wallet, label: 'Payroll' }] : []),
+    ...(!canSeePayroll ? [{ to: '/app/payroll/my-payslip', icon: Wallet, label: 'My Payslip' }] : []),
+    ...(canSeeReports ? [{ to: '/app/reports', icon: BarChart3, label: 'Reports' }] : []),
   ];
 
   const bottom = [
-    ...(r === 'admin' ? [{ to: '/app/settings', icon: Settings, label: 'Settings' }] : []),
+    ...(isAdminExact ? [{ to: '/app/settings', icon: Settings, label: 'Settings' }] : []),
   ];
 
   return { main, bottom };
@@ -67,6 +77,11 @@ export default function AppLayout() {
   const [notifications, setNotifications] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = useRef(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchIdx, setSearchIdx] = useState(0);
+  const searchInputRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -116,6 +131,48 @@ export default function AppLayout() {
   }, [notifOpen]);
 
   const unreadCount = notifications.filter((n) => n.id.startsWith('leave-')).length;
+
+  // Command palette: ⌘K / Ctrl+K
+  useEffect(() => {
+    function handleKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+        setSearchQuery('');
+        setSearchIdx(0);
+      }
+      if (e.key === 'Escape') setSearchOpen(false);
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen && searchInputRef.current) searchInputRef.current.focus();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const allNav = [...mainNav, ...bottomNav].map(n => ({
+      label: n.label, to: n.to, type: 'page', icon: n.icon,
+    }));
+    if (!q) { setSearchResults(allNav); setSearchIdx(0); return; }
+    const filtered = allNav.filter(n => n.label.toLowerCase().includes(q));
+    setSearchResults(filtered);
+    setSearchIdx(0);
+  }, [searchQuery, searchOpen]);
+
+  const executeSearch = (item) => {
+    navigate(item.to);
+    setSearchOpen(false);
+    setSearchQuery('');
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSearchIdx(i => Math.min(i + 1, searchResults.length - 1)); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setSearchIdx(i => Math.max(i - 1, 0)); }
+    if (e.key === 'Enter' && searchResults[searchIdx]) { executeSearch(searchResults[searchIdx]); }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -209,18 +266,17 @@ export default function AppLayout() {
               <Menu size={20} />
             </button>
 
-            {/* Search */}
-            <div className="hidden md:flex items-center gap-2 bg-surface-soft rounded-md px-3 py-2 w-64">
+            {/* Search trigger */}
+            <button
+              onClick={() => { setSearchOpen(true); setSearchQuery(''); setSearchIdx(0); }}
+              className="hidden md:flex items-center gap-2 bg-surface-soft rounded-md px-3 py-2 w-64 text-left hover:bg-surface-card transition-colors"
+            >
               <Search size={16} className="text-muted" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="bg-transparent border-none outline-none text-body-sm text-ink placeholder:text-muted w-full"
-              />
+              <span className="text-body-sm text-muted flex-1">Search...</span>
               <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 bg-canvas border border-hairline rounded text-[11px] text-muted font-mono">
                 ⌘K
               </kbd>
-            </div>
+            </button>
           </div>
 
           <div className="flex items-center gap-3">
@@ -334,14 +390,16 @@ export default function AppLayout() {
                       <User size={14} />
                       My Profile
                     </NavLink>
-                    <NavLink
-                      to="/app/settings"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-body-sm text-muted hover:text-ink hover:bg-surface-soft transition-all"
-                    >
-                      <Settings size={14} />
-                      Settings
-                    </NavLink>
+                    {currentUser.role.toLowerCase() === 'admin' && (
+                      <NavLink
+                        to="/app/settings"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-body-sm text-muted hover:text-ink hover:bg-surface-soft transition-all"
+                      >
+                        <Settings size={14} />
+                        Settings
+                      </NavLink>
+                    )}
                     <div className="border-t border-hairline mt-1">
                       <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 text-body-sm text-muted hover:text-error hover:bg-red-50 transition-all w-full">
                         <LogOut size={14} />
@@ -360,6 +418,56 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Command Palette */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" onClick={() => setSearchOpen(false)}>
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
+          <div
+            className="relative bg-canvas border border-hairline rounded-xl shadow-lg w-full max-w-lg overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Search input */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-hairline">
+              <Search size={18} className="text-muted shrink-0" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search pages..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                className="bg-transparent border-none outline-none text-body-sm text-ink placeholder:text-muted w-full"
+              />
+              <kbd className="shrink-0 px-1.5 py-0.5 bg-surface-soft border border-hairline rounded text-[11px] text-muted font-mono">ESC</kbd>
+            </div>
+
+            {/* Results */}
+            <div className="max-h-72 overflow-y-auto py-2">
+              {searchResults.length === 0 ? (
+                <p className="px-4 py-6 text-center text-body-sm text-muted">No results found.</p>
+              ) : searchResults.map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.to}
+                    onClick={() => executeSearch(item)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-body-sm transition-colors ${
+                      i === searchIdx ? 'bg-surface-soft text-ink' : 'text-muted hover:bg-surface-soft/50 hover:text-ink'
+                    }`}
+                  >
+                    {Icon && <Icon size={16} className="shrink-0" />}
+                    <span className="flex-1">{item.label}</span>
+                    {i === searchIdx && (
+                      <span className="text-caption text-muted">Enter ↵</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

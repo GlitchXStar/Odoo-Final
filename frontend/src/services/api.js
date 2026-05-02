@@ -75,7 +75,11 @@ export const attendance = {
 // Leave APIs
 export const leaves = {
   apply: (data) => apiRequest('/api/leaves/apply', { method: 'POST', body: data }),
-  getAll: () => apiRequest('/api/leaves'),
+  getAll: (params = '') => apiRequest(`/api/leaves${params}`),
+  getMine: () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    return apiRequest(`/api/leaves?userId=${user.id}`);
+  },
   approve: (id) => apiRequest(`/api/leaves/${id}/approve`, { method: 'PUT' }),
   reject: (id, rejectionReason = 'Rejected by manager') => apiRequest(`/api/leaves/${id}/reject`, { method: 'PUT', body: { rejectionReason } }),
   cancel: (id) => apiRequest(`/api/leaves/${id}/cancel`, { method: 'PUT' }),

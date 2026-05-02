@@ -4,7 +4,7 @@ import {
   ArrowLeft, Save, ChevronDown, User, Building2,
   Mail, Phone, MapPin, CreditCard, Calendar
 } from 'lucide-react';
-import { employees, users } from '../services/api.js';
+import { employees, users, roles as rolesApi } from '../services/api.js';
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 const designations = [
@@ -20,7 +20,7 @@ const employmentTypes = ['Full-Time', 'Part-Time', 'Contract', 'Intern'];
 const emptyForm = {
   firstName: '', lastName: '', email: '', phone: '',
   employmentType: 'Full-Time',
-  department: '', designation: '', managerId: '',
+  department: '', designation: '', managerId: '', roleId: '',
   joinDate: '', gender: '', dob: '', maritalStatus: '',
   bloodGroup: '', address: '', city: '', state: '', pincode: '',
   emergencyName: '', emergencyPhone: '', emergencyRelation: '',
@@ -81,11 +81,16 @@ export default function EmployeeForm() {
   const [form, setForm] = useState(emptyForm);
   const [userId, setUserId] = useState(null);
   const [managerList, setManagerList] = useState([]);
+  const [allRoles, setAllRoles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = (currentUser.role_name || '').toLowerCase() === 'admin';
+
   useEffect(() => {
     fetchManagers();
+    if (isAdmin) rolesApi.getAll().then(r => setAllRoles(r?.data || [])).catch(() => {});
     if (isEdit && id) fetchEmployee(id);
   }, [isEdit, id]);
 
@@ -111,6 +116,7 @@ export default function EmployeeForm() {
         department: d.department ?? '',
         designation: d.designation ?? '',
         managerId: d.manager_id ? String(d.manager_id) : '',
+        roleId: d.role_id ? String(d.role_id) : '',
         joinDate: d.date_of_joining ? d.date_of_joining.slice(0, 10) : '',
         gender: d.gender ?? '',
         dob: d.date_of_birth ? d.date_of_birth.slice(0, 10) : '',
@@ -169,7 +175,11 @@ export default function EmployeeForm() {
     try {
       if (isEdit) {
         await employees.update(id, toApiPayload(form));
-        if (userId) await users.update(userId, toUserPayload(form));
+        if (userId) {
+          const userUpdate = toUserPayload(form);
+          if (form.roleId) userUpdate.roleId = parseInt(form.roleId);
+          await users.update(userId, userUpdate);
+        }
       } else {
         if (!form.email) throw new Error('Email is required.');
         if (!form.joinDate) throw new Error('Join date is required.');
@@ -178,7 +188,7 @@ export default function EmployeeForm() {
           lastName: form.lastName,
           email: form.email,
           phone: form.phone || undefined,
-          roleId: 4,
+          roleId: form.roleId ? parseInt(form.roleId) : 4,
           dateOfJoining: form.joinDate,
           employmentType: form.employmentType,
           department: form.department || undefined,
@@ -304,6 +314,23 @@ export default function EmployeeForm() {
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
               </div>
             </FormField>
+            {isAdmin && allRoles.length > 0 && (
+              <FormField label="Role" id="roleId" required>
+                <div className="relative">
+                  <select
+                    id="roleId"
+                    value={form.roleId}
+                    onChange={update('roleId')}
+                    className="input-field appearance-none pr-10 cursor-pointer"
+                    required
+                  >
+                    <option value="" disabled>Select role</option>
+                    {allRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                </div>
+              </FormField>
+            )}
             <FormField label="Reporting To" id="managerId">
               <div className="relative">
                 <select

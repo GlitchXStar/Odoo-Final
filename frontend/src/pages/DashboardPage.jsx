@@ -58,7 +58,7 @@ export default function DashboardPage() {
     }
   }, []);
 
-  const isAdminUser = ADMIN_ROLES.includes((user?.role_name || user?.role || '').toLowerCase());
+  const isAdminUser = (user?.role_name || user?.role || '').toLowerCase() === 'admin';
   const ActiveDashboard = dashboardMap[activeRole] || EmployeeDashboard;
 
   return (

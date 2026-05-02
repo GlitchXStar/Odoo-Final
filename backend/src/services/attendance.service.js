@@ -168,17 +168,21 @@ function parseTimeToMinutes(timeStr) {
   return parseInt(parts[0]) * 60 + parseInt(parts[1]);
 }
 
-const updateAttendance = async (id, companyId, { status, remarks }) => {
+const updateAttendance = async (id, companyId, currentUserId, { status, remarks }) => {
   const validStatuses = Object.values(ATTENDANCE_STATUS);
   if (!validStatuses.includes(status)) {
     throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 400);
   }
 
   const existing = await query(
-    'SELECT id FROM attendance WHERE id = $1 AND company_id = $2',
+    'SELECT id, user_id FROM attendance WHERE id = $1 AND company_id = $2',
     [id, companyId]
   );
   if (existing.rows.length === 0) throw new AppError('Attendance record not found.', 404);
+
+  if (existing.rows[0].user_id === currentUserId) {
+    throw new AppError('You cannot modify your own attendance record.', 403);
+  }
 
   const result = await query(
     `UPDATE attendance SET status = $1, remarks = COALESCE($2, remarks), updated_at = NOW()

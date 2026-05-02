@@ -4,7 +4,7 @@ const { AppError } = require('../middleware/errorHandler.middleware');
 
 const getAllEmployees = async (companyId, { page = 1, limit = 20, status, department }) => {
   const offset = (page - 1) * limit;
-  let sql = `SELECT ep.*, u.email, u.login_id, u.first_name, u.last_name, u.phone, r.name AS role_name
+  let sql = `SELECT ep.*, u.email, u.login_id, u.first_name, u.last_name, u.phone, u.role_id, r.name AS role_name
              FROM employee_profiles ep
              INNER JOIN users u ON ep.user_id = u.id
              INNER JOIN roles r ON u.role_id = r.id
@@ -37,7 +37,7 @@ const getAllEmployees = async (companyId, { page = 1, limit = 20, status, depart
 
 const getEmployeeById = async (id, companyId) => {
   const result = await query(
-    `SELECT ep.*, u.email, u.login_id, u.first_name, u.last_name, u.phone, r.name AS role_name
+    `SELECT ep.*, u.email, u.login_id, u.first_name, u.last_name, u.phone, u.role_id, r.name AS role_name
      FROM employee_profiles ep
      INNER JOIN users u ON ep.user_id = u.id
      INNER JOIN roles r ON u.role_id = r.id
@@ -54,7 +54,7 @@ const getEmployeeById = async (id, companyId) => {
 
 const getEmployeeByUserId = async (userId, companyId) => {
   const result = await query(
-    `SELECT ep.*, u.email, u.login_id, u.first_name, u.last_name, u.phone, r.name AS role_name
+    `SELECT ep.*, u.email, u.login_id, u.first_name, u.last_name, u.phone, u.role_id, r.name AS role_name
      FROM employee_profiles ep
      INNER JOIN users u ON ep.user_id = u.id
      INNER JOIN roles r ON u.role_id = r.id
