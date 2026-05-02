@@ -63,6 +63,7 @@ const updateUser = async (id, companyId, updates) => {
 
   if (updates.firstName) { fields.push(`first_name = $${idx++}`); params.push(updates.firstName); }
   if (updates.lastName) { fields.push(`last_name = $${idx++}`); params.push(updates.lastName); }
+  if (updates.email) { fields.push(`email = $${idx++}`); params.push(updates.email); }
   if (updates.phone !== undefined) { fields.push(`phone = $${idx++}`); params.push(updates.phone); }
   if (updates.roleId) { fields.push(`role_id = $${idx++}`); params.push(updates.roleId); }
   if (updates.isActive !== undefined) { fields.push(`is_active = $${idx++}`); params.push(updates.isActive); }

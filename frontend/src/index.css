@@ -1,0 +1,157 @@
+@import '@fontsource/cal-sans';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================================
+   Base Styles
+   ======================================== */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #374151;
+    background-color: #ffffff;
+    line-height: 1.5;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #111111;
+  }
+
+  ::selection {
+    background-color: #111111;
+    color: #ffffff;
+  }
+}
+
+/* ========================================
+   Component Styles
+   ======================================== */
+@layer components {
+  /* Primary Button */
+  .btn-primary {
+    @apply bg-ink text-on-primary font-body text-btn px-5 py-2.5 rounded-md
+           hover:bg-[#242424] active:bg-[#333333] transition-all duration-150
+           disabled:bg-surface-strong disabled:text-muted disabled:cursor-not-allowed;
+  }
+
+  /* Secondary Button */
+  .btn-secondary {
+    @apply bg-canvas text-ink font-body text-btn px-5 py-2.5 rounded-md
+           border border-hairline hover:bg-surface-soft active:bg-surface-card
+           transition-all duration-150;
+  }
+
+  /* Text Link Button */
+  .btn-text {
+    @apply text-ink font-body text-btn hover:opacity-70 transition-opacity duration-150;
+  }
+
+  /* Feature Card */
+  .card-feature {
+    @apply bg-surface-card rounded-lg p-8 transition-all duration-200
+           hover:shadow-soft;
+  }
+
+  /* Product Mockup Card */
+  .card-mockup {
+    @apply bg-canvas rounded-lg p-6 border border-hairline shadow-soft;
+  }
+
+  /* Hero Mockup Card */
+  .card-hero-mockup {
+    @apply bg-canvas rounded-xl p-6 border border-hairline shadow-elevated;
+  }
+
+  /* Dark Card */
+  .card-dark {
+    @apply bg-surface-dark rounded-lg p-8 text-on-dark;
+  }
+
+  /* Input Field */
+  .input-field {
+    @apply w-full h-10 px-3 bg-canvas border border-hairline rounded-md
+           font-body text-body-md text-ink placeholder:text-muted
+           focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink
+           transition-all duration-150;
+  }
+
+  /* Status Badge */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-pill text-caption font-medium;
+  }
+
+  .badge-present { @apply bg-status-present-bg text-status-present-text; }
+  .badge-absent { @apply bg-status-absent-bg text-status-absent-text; }
+  .badge-leave { @apply bg-status-leave-bg text-status-leave-text; }
+  .badge-halfday { @apply bg-status-halfday-bg text-status-halfday-text; }
+  .badge-approved { @apply bg-status-approved-bg text-status-approved-text; }
+  .badge-pending { @apply bg-status-pending-bg text-status-pending-text; }
+  .badge-rejected { @apply bg-status-rejected-bg text-status-rejected-text; }
+
+  /* Nav Pill */
+  .nav-pill {
+    @apply px-4 py-2 rounded-pill text-nav font-body text-muted
+           hover:text-ink hover:bg-canvas transition-all duration-150;
+  }
+
+  .nav-pill-active {
+    @apply px-4 py-2 rounded-pill text-nav font-body text-ink
+           bg-canvas shadow-soft;
+  }
+
+  /* Section Container */
+  .section-container {
+    @apply max-w-content mx-auto px-6 lg:px-8;
+  }
+
+  /* Section Spacing */
+  .section-spacing {
+    @apply py-section;
+  }
+}
+
+/* ========================================
+   Utility Overrides
+   ======================================== */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .font-cal {
+    font-family: 'Cal Sans', 'Inter', sans-serif;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+
+  @page {
+    size: A4;
+    margin: 12mm 15mm;
+  }
+
+  /* Ensure colors print */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Ensure borders print */
+  .border-ink { border-color: #1a1a1a !important; }
+}

@@ -6,7 +6,7 @@ Smart Human Resource Management System — a production-ready, multi-company HRM
 
 ```
 Odoo-Final/
-├── backend/          # Node.js + Express API server
+├── backend/          # Node.js + Express API server (Port 3000)
 │   ├── src/
 │   │   ├── config/         # DB pool, constants, tax slabs
 │   │   ├── controllers/    # HTTP request handlers
@@ -17,8 +17,37 @@ Odoo-Final/
 │   ├── migrations/         # SQL migration files
 │   ├── server.js           # Entry point
 │   └── .env                # Environment variables
+├── frontend/         # React + Vite SPA (Port 5173)
+│   ├── src/
+│   │   ├── components/     # Reusable UI components
+│   │   ├── hooks/          # Custom React hooks (useAuth)
+│   │   ├── layouts/        # Page layouts
+│   │   ├── pages/          # Route pages
+│   │   ├── services/       # API integration layer
+│   │   └── assets/         # Static assets
+│   ├── vite.config.js      # Vite config with proxy
+│   └── package.json
+├── cli/              # Python CLI tools for testing
 └── README.md
 ```
+
+## Quick Start
+
+```bash
+# Install all dependencies
+npm run install:all
+
+# Configure environment
+cp backend/.env.example backend/.env
+# Edit backend/.env with your database credentials
+
+# Start both backend and frontend together
+npm run dev
+```
+
+**Frontend**: http://localhost:5173  
+**Backend API**: http://localhost:3000  
+**Health Check**: http://localhost:3000/health
 
 ## Tech Stack
 

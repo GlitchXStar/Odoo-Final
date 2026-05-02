@@ -40,4 +40,16 @@ const getAttendance = async (req, res, next) => {
   }
 };
 
-module.exports = { checkIn, checkOut, getAttendance };
+const updateAttendance = async (req, res, next) => {
+  try {
+    const { status, remarks } = req.body;
+    const record = await attendanceService.updateAttendance(
+      parseInt(req.params.id), req.companyId, { status, remarks }
+    );
+    res.json({ success: true, message: 'Attendance updated.', data: record });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { checkIn, checkOut, getAttendance, updateAttendance };

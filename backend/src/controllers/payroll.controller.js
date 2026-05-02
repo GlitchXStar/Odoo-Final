@@ -1,4 +1,5 @@
 const payrollService = require('../services/payroll.service');
+const { AppError } = require('../middleware/errorHandler.middleware');
 const auditService = require('../services/audit.service');
 
 const runPayroll = async (req, res, next) => {
@@ -50,9 +51,10 @@ const runPayroll = async (req, res, next) => {
 const getPayroll = async (req, res, next) => {
   try {
     const { userId, month, year } = req.query;
+    const isEmployee = req.user.roleName === 'Employee';
 
-    // Employees can only see their own payroll
-    const effectiveUserId = req.user.roleName === 'Employee' ? req.user.id : (userId ? parseInt(userId) : req.user.id);
+    // Employees only see their own; Admins/Officers see all (or filter by userId)
+    const effectiveUserId = isEmployee ? req.user.id : (userId ? parseInt(userId) : null);
 
     const result = await payrollService.getPayrollByUser(req.companyId, effectiveUserId, {
       month: month ? parseInt(month) : undefined,
@@ -65,4 +67,15 @@ const getPayroll = async (req, res, next) => {
   }
 };
 
-module.exports = { runPayroll, getPayroll };
+const estimatePayroll = async (req, res, next) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) throw new AppError('userId is required.', 400);
+    const result = await payrollService.estimatePayroll(req.companyId, parseInt(userId));
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { runPayroll, getPayroll, estimatePayroll };

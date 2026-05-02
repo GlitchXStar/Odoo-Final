@@ -102,7 +102,8 @@ const runPayroll = async (companyId, { userId, month, year, generatedBy }) => {
     const perDaySalary = grossSalary / workingDays;
     const leaveDeduction = unpaidLeaveDays * perDaySalary;
     const absentDeduction = absentDays * perDaySalary;
-    const totalSalaryDeduction = leaveDeduction + absentDeduction;
+    const halfDayDeduction = halfDays * 0.5 * perDaySalary;
+    const totalSalaryDeduction = leaveDeduction + absentDeduction + halfDayDeduction;
 
     const adjustedGross = grossSalary - totalSalaryDeduction;
 
@@ -146,16 +147,16 @@ const runPayroll = async (companyId, { userId, month, year, generatedBy }) => {
          basic, hra, allowances, bonus, gross_salary,
          pf_deduction, esi_deduction, professional_tax, income_tax, tds, other_deductions,
          total_deductions, net_salary,
-         working_days, present_days, leave_days, absent_days,
+         working_days, present_days, leave_days, absent_days, half_days,
          overtime_hours, overtime_amount,
          status, generated_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
        RETURNING *`,
       [userId, companyId, month, year, salary.id,
        basic, hra, allowances, bonus, adjustedGross,
        pfDeduction, esiDeduction, professionalTax, incomeTax, tds, 0,
        totalDeductions, finalNet,
-       workingDays, effectivePresentDays, leaveDays, absentDays,
+       workingDays, effectivePresentDays, leaveDays, absentDays, halfDays,
        Math.round(overtimeHours * 100) / 100, overtimeAmount,
        'Processed', generatedBy]
     );
@@ -196,20 +197,30 @@ const runBulkPayroll = async (companyId, { month, year, generatedBy }) => {
 };
 
 const getPayrollByUser = async (companyId, userId, { month, year }) => {
-  let sql = 'SELECT * FROM payroll WHERE company_id = $1 AND user_id = $2';
-  const params = [companyId, userId];
-  let idx = 3;
+  let sql = `SELECT p.*, u.first_name, u.last_name, u.email, u.login_id,
+                    ep.department, ep.designation, ep.bank_name, ep.bank_account_number,
+                    ep.bank_ifsc, ep.pan_number, ep.employee_code
+             FROM payroll p
+             INNER JOIN users u ON p.user_id = u.id
+             LEFT JOIN employee_profiles ep ON u.id = ep.user_id
+             WHERE p.company_id = $1`;
+  const params = [companyId];
+  let idx = 2;
 
+  if (userId) {
+    sql += ` AND p.user_id = $${idx++}`;
+    params.push(userId);
+  }
   if (month) {
-    sql += ` AND month = $${idx++}`;
+    sql += ` AND p.month = $${idx++}`;
     params.push(month);
   }
   if (year) {
-    sql += ` AND year = $${idx++}`;
+    sql += ` AND p.year = $${idx++}`;
     params.push(year);
   }
 
-  sql += ' ORDER BY year DESC, month DESC';
+  sql += ' ORDER BY p.year DESC, p.month DESC';
   const result = await query(sql, params);
   return result.rows;
 };
@@ -239,4 +250,57 @@ function calculateMonthlyIncomeTax(annualSalary) {
   return Math.round((tax / 12) * 100) / 100;
 }
 
-module.exports = { runPayroll, runBulkPayroll, getPayrollByUser };
+const estimatePayroll = async (companyId, userId) => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const salaryResult = await query(
+    `SELECT * FROM salary_structure
+     WHERE user_id = $1 AND company_id = $2 AND is_active = true
+       AND effective_from <= $3
+       AND (effective_to IS NULL OR effective_to >= $3)
+     ORDER BY effective_from DESC LIMIT 1`,
+    [userId, companyId, today]
+  );
+
+  if (salaryResult.rows.length === 0) {
+    throw new AppError('No active salary structure found for this employee.', 404);
+  }
+
+  const salary = salaryResult.rows[0];
+  const basic = parseFloat(salary.basic);
+  const hra = parseFloat(salary.hra);
+  const allowances = parseFloat(salary.conveyance_allowance) +
+                     parseFloat(salary.medical_allowance) +
+                     parseFloat(salary.special_allowance) +
+                     parseFloat(salary.other_allowances);
+  const bonus = parseFloat(salary.bonus);
+  const grossSalary = basic + hra + allowances + bonus;
+
+  const pfBasic = Math.min(basic, 15000);
+  const pfDeduction = Math.round((pfBasic * 12) / 100);
+
+  const esiDeduction = grossSalary <= 21000 ? Math.round((grossSalary * 0.75) / 100) : 0;
+
+  const professionalTax = calculateProfessionalTax(grossSalary);
+
+  const incomeTax = calculateMonthlyIncomeTax(grossSalary * 12);
+
+  const totalDeductions = pfDeduction + esiDeduction + professionalTax + incomeTax;
+  const netSalary = Math.round((grossSalary - totalDeductions) * 100) / 100;
+
+  return {
+    basic,
+    hra,
+    allowances,
+    bonus,
+    gross_salary: grossSalary,
+    pf_deduction: pfDeduction,
+    esi_deduction: esiDeduction,
+    professional_tax: professionalTax,
+    income_tax: incomeTax,
+    total_deductions: totalDeductions,
+    net_salary: netSalary,
+  };
+};
+
+module.exports = { runPayroll, runBulkPayroll, getPayrollByUser, estimatePayroll };
