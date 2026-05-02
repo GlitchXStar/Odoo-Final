@@ -8,6 +8,11 @@ import { payroll } from '../services/api.js';
 
 const departments = ['All', 'Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations'];
 
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
+
 export default function PayslipList() {
   const [payslips, setPayslips] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +36,28 @@ export default function PayslipList() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportCSV = () => {
+    if (filtered.length === 0) return;
+    const headers = ['Payslip ID','Employee','Department','Month','Gross Salary','Deductions','Net Pay'];
+    const rows = filtered.map(ps => [
+      ps.id,
+      `${ps.first_name || ''} ${ps.last_name || ''}`.trim(),
+      ps.department || '',
+      `${MONTHS[(ps.month || 1) - 1]} ${ps.year}`,
+      Number(ps.gross_salary || 0).toFixed(2),
+      Number(ps.total_deductions || 0).toFixed(2),
+      Number(ps.net_salary || 0).toFixed(2),
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `payslips_${monthFilter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const filtered = payslips.filter((ps) => {
@@ -71,7 +98,11 @@ export default function PayslipList() {
             View and download generated payslips.
           </p>
         </div>
-        <button className="btn-secondary inline-flex items-center gap-2">
+        <button
+          onClick={exportCSV}
+          disabled={filtered.length === 0}
+          className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <Download size={16} />
           Export All
         </button>
@@ -92,12 +123,36 @@ export default function PayslipList() {
           </div>
           <div className="flex items-center gap-2">
             <Calendar size={16} className="text-muted" />
-            <input
-              type="month"
-              value={monthFilter}
-              onChange={(e) => setMonthFilter(e.target.value)}
-              className="input-field py-1.5 w-auto text-body-sm"
-            />
+            <div className="relative">
+              <select
+                value={parseInt(monthFilter.split('-')[1])}
+                onChange={(e) => {
+                  const y = monthFilter.split('-')[0];
+                  setMonthFilter(`${y}-${String(e.target.value).padStart(2, '0')}`);
+                }}
+                className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer min-w-[140px]"
+              >
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i + 1}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+            </div>
+            <div className="relative">
+              <select
+                value={parseInt(monthFilter.split('-')[0])}
+                onChange={(e) => {
+                  const m = monthFilter.split('-')[1];
+                  setMonthFilter(`${e.target.value}-${m}`);
+                }}
+                className="input-field py-2 pl-3 pr-8 text-body-sm font-medium appearance-none cursor-pointer min-w-[90px]"
+              >
+                {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+            </div>
           </div>
           <div className="relative">
             <select
