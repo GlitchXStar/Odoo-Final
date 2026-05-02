@@ -185,4 +185,15 @@ const verifyOTP = async (req, res, next) => {
   }
 };
 
-module.exports = { registerAdmin, createUser, login, changePassword, requestOTP, verifyOTP };
+const resetPassword = async (req, res, next) => {
+  try {
+    const { identifier, otp, newPassword } = req.body;
+    const result = await authService.resetPassword(identifier, otp, newPassword);
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { registerAdmin, createUser, login, changePassword, requestOTP, verifyOTP, resetPassword };

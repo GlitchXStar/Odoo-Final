@@ -186,4 +186,53 @@ const createEmployeeWithUser = async (companyId, { firstName, lastName, email, p
   }
 };
 
-module.exports = { getAllEmployees, getEmployeeById, getEmployeeByUserId, createEmployee, updateEmployee, createEmployeeWithUser };
+// ─── Self-update: limited personal fields only ──────────────
+const updateMyProfile = async (userId, companyId, updates) => {
+  // Find the employee profile by user_id
+  const empResult = await query(
+    'SELECT id FROM employee_profiles WHERE user_id = $1 AND company_id = $2',
+    [userId, companyId]
+  );
+
+  if (empResult.rows.length === 0) {
+    throw new AppError('Employee profile not found.', 404);
+  }
+  const empId = empResult.rows[0].id;
+
+  // Only allow personal fields (not department, designation, status, salary, etc.)
+  const allowedFields = {
+    dateOfBirth: 'date_of_birth', gender: 'gender', maritalStatus: 'marital_status',
+    bloodGroup: 'blood_group', emergencyContactName: 'emergency_contact_name',
+    emergencyContactPhone: 'emergency_contact_phone', permanentAddress: 'permanent_address',
+    currentAddress: 'current_address',
+  };
+
+  const fields = [];
+  const params = [];
+  let idx = 1;
+
+  for (const [key, col] of Object.entries(allowedFields)) {
+    if (updates[key] !== undefined) {
+      fields.push(`${col} = $${idx++}`);
+      params.push(updates[key]);
+    }
+  }
+
+  if (fields.length > 0) {
+    params.push(empId, companyId);
+    await query(
+      `UPDATE employee_profiles SET ${fields.join(', ')} WHERE id = $${idx++} AND company_id = $${idx++} RETURNING *`,
+      params
+    );
+  }
+
+  // Also allow updating phone on the users table
+  if (updates.phone !== undefined) {
+    await query('UPDATE users SET phone = $1 WHERE id = $2', [updates.phone, userId]);
+  }
+
+  // Return the updated profile
+  return getEmployeeByUserId(userId, companyId);
+};
+
+module.exports = { getAllEmployees, getEmployeeById, getEmployeeByUserId, createEmployee, updateEmployee, updateMyProfile, createEmployeeWithUser };

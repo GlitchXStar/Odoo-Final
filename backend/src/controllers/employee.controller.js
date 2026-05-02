@@ -91,4 +91,13 @@ const createEmployeeWithUser = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllEmployees, getEmployeeById, getMyProfile, createEmployee, updateEmployee, createEmployeeWithUser };
+const updateMyProfile = async (req, res, next) => {
+  try {
+    const updated = await employeeService.updateMyProfile(req.user.id, req.companyId, req.body);
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getAllEmployees, getEmployeeById, getMyProfile, updateMyProfile, createEmployee, updateEmployee, createEmployeeWithUser };
