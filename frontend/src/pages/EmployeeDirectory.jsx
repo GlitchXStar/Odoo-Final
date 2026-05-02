@@ -24,6 +24,7 @@ export default function EmployeeDirectory() {
   const [deptFilter, setDeptFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, total: 0, totalPages: 1 });
 
   useEffect(() => {
     fetchEmployees();
@@ -33,8 +34,12 @@ export default function EmployeeDirectory() {
     try {
       setLoading(true);
       const response = await employees.getAll();
-      const list = response?.data?.employees ?? response?.data ?? response;
+      const data = response?.data ?? response;
+      const list = data?.employees ?? (Array.isArray(data) ? data : []);
       setEmployeeList(Array.isArray(list) ? list : []);
+      if (data?.pagination) {
+        setPagination(data.pagination);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load employees');
     } finally {
@@ -246,22 +251,37 @@ export default function EmployeeDirectory() {
         {/* Pagination */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-hairline">
           <span className="text-caption text-muted">
-            Showing {filtered.length} of {employeeList.length} employees
+            Showing {filtered.length} of {pagination.total || employeeList.length} employees
           </span>
-          <div className="flex items-center gap-1">
-            <button className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">
-              <ChevronLeft size={16} />
-            </button>
-            <button className="px-2.5 py-1 text-caption font-medium bg-ink text-on-primary rounded-md">
-              1
-            </button>
-            <button className="px-2.5 py-1 text-caption text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">
-              2
-            </button>
-            <button className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all">
-              <ChevronRight size={16} />
-            </button>
-          </div>
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                disabled={pagination.page <= 1}
+                onClick={() => setPagination(p => ({...p, page: p.page - 1}))}
+                className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(pg => (
+                <button
+                  key={pg}
+                  onClick={() => setPagination(p => ({...p, page: pg}))}
+                  className={`px-2.5 py-1 text-caption font-medium rounded-md transition-all ${
+                    pg === pagination.page ? 'bg-ink text-on-primary' : 'text-muted hover:text-ink hover:bg-surface-soft'
+                  }`}
+                >
+                  {pg}
+                </button>
+              ))}
+              <button
+                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => setPagination(p => ({...p, page: p.page + 1}))}
+                className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

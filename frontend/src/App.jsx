@@ -23,6 +23,7 @@ import SalaryEditor from './pages/SalaryEditor';
 import ReportsDashboard from './pages/ReportsDashboard';
 import ReportDetail from './pages/ReportDetail';
 import SettingsPage from './pages/SettingsPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import RoleGuard, { ADMIN_ROLES, HR_ROLES, PAYROLL_ROLES } from './components/RoleGuard';
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* App Routes (protected — wrapped in AppLayout) */}
         <Route path="/app" element={<AppLayout />}>

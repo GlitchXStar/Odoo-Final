@@ -37,6 +37,8 @@ export const auth = {
   verifyOtp: (data) => apiRequest('/api/auth/verify-otp', { method: 'POST', body: data }),
   createUser: (data) => apiRequest('/api/auth/create-user', { method: 'POST', body: data }),
   changePassword: (data) => apiRequest('/api/auth/change-password', { method: 'POST', body: data }),
+  forgotPassword: (data) => apiRequest('/api/auth/forgot-password', { method: 'POST', body: data }),
+  resetPassword: (data) => apiRequest('/api/auth/reset-password', { method: 'POST', body: data }),
 };
 
 // Employee APIs
@@ -44,6 +46,7 @@ export const employees = {
   getAll: () => apiRequest('/api/employees'),
   getById: (id) => apiRequest(`/api/employees/${id}`),
   getMe: () => apiRequest('/api/employees/me'),
+  updateMe: (data) => apiRequest('/api/employees/me', { method: 'PUT', body: data }),
   create: (data) => apiRequest('/api/employees', { method: 'POST', body: data }),
   createWithUser: (data) => apiRequest('/api/employees/create-with-user', { method: 'POST', body: data }),
   update: (id, data) => apiRequest(`/api/employees/${id}`, { method: 'PUT', body: data }),

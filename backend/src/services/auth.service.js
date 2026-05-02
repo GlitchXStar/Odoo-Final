@@ -269,6 +269,15 @@ const registerAdmin = async ({ firstName, lastName, email, phone, password,
     );
     const user = userResult.rows[0];
 
+    // 4. Auto-create employee profile for the admin
+    await client.query(
+      `INSERT INTO employee_profiles
+         (user_id, company_id, employee_code, department, designation,
+          date_of_joining, employment_type, status)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, 'Full-time', 'Active')`,
+      [user.id, company.id, loginId, 'Management', 'Administrator']
+    );
+
     await client.query('COMMIT');
 
     return { user, company, loginId };
@@ -280,4 +289,67 @@ const registerAdmin = async ({ firstName, lastName, email, phone, password,
   }
 };
 
-module.exports = { createUser, login, changePassword, generateLoginId, generateSecurePassword, registerAdmin };
+// ─── Reset Password (OTP-based) ──────────────────────────────
+const resetPassword = async (identifier, otpCode, newPassword) => {
+  // Find user
+  const userResult = await query(
+    `SELECT u.id, u.email, u.is_active
+     FROM users u
+     WHERE u.email = $1 OR u.login_id = $1`,
+    [identifier]
+  );
+
+  if (userResult.rows.length === 0) {
+    throw new AppError('User not found.', 404);
+  }
+
+  const user = userResult.rows[0];
+
+  if (!user.is_active) {
+    throw new AppError('Account is deactivated. Contact admin.', 403);
+  }
+
+  // Verify OTP
+  const otpResult = await query(
+    `SELECT id, otp_code, expires_at, attempts
+     FROM otp_verifications
+     WHERE user_id = $1 AND is_used = FALSE AND expires_at > NOW()
+     ORDER BY created_at DESC LIMIT 1`,
+    [user.id]
+  );
+
+  if (otpResult.rows.length === 0) {
+    throw new AppError('No valid OTP found. Please request a new one.', 400);
+  }
+
+  const otpRecord = otpResult.rows[0];
+
+  if (otpRecord.attempts >= 3) {
+    await query('UPDATE otp_verifications SET is_used = TRUE WHERE id = $1', [otpRecord.id]);
+    throw new AppError('Maximum OTP attempts exceeded. Please request a new OTP.', 429);
+  }
+
+  await query('UPDATE otp_verifications SET attempts = attempts + 1 WHERE id = $1', [otpRecord.id]);
+
+  if (otpRecord.otp_code !== otpCode) {
+    const remaining = 3 - (otpRecord.attempts + 1);
+    throw new AppError(
+      `Invalid OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
+      401
+    );
+  }
+
+  // OTP valid — mark as used
+  await query('UPDATE otp_verifications SET is_used = TRUE WHERE id = $1', [otpRecord.id]);
+
+  // Set new password
+  const newHash = await bcrypt.hash(newPassword, 12);
+  await query(
+    'UPDATE users SET password_hash = $1, is_first_login = FALSE WHERE id = $2',
+    [newHash, user.id]
+  );
+
+  return { message: 'Password reset successfully. You can now login with your new password.' };
+};
+
+module.exports = { createUser, login, changePassword, resetPassword, generateLoginId, generateSecurePassword, registerAdmin };

@@ -67,4 +67,19 @@ const registerAdminSchema = Joi.object({
   companyPincode: Joi.string().max(20).allow(null, ''),
 });
 
-module.exports = { registerAdminSchema, createUserSchema, loginSchema, changePasswordSchema, requestOtpSchema, verifyOtpSchema };
+const resetPasswordSchema = Joi.object({
+  identifier: Joi.string().required().messages({
+    'string.empty': 'Email or Login ID is required.',
+  }),
+  otp: Joi.string().length(6).pattern(/^\d{6}$/).required().messages({
+    'string.length': 'OTP must be exactly 6 digits.',
+    'string.pattern.base': 'OTP must be exactly 6 digits.',
+  }),
+  newPassword: Joi.string().min(8).max(128).required()
+    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%&*])/)
+    .messages({
+      'string.pattern.base': 'Password must contain at least one uppercase, one lowercase, one digit, and one special character (!@#$%&*).',
+    }),
+});
+
+module.exports = { registerAdminSchema, createUserSchema, loginSchema, changePasswordSchema, requestOtpSchema, verifyOtpSchema, resetPasswordSchema };
