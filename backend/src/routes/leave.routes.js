@@ -14,5 +14,6 @@ router.post('/apply', validate(applyLeaveSchema), leaveController.applyLeave);
 router.get('/', leaveController.getLeaves);
 router.put('/:id/approve', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER, ROLES.PAYROLL_OFFICER), leaveController.approveLeave);
 router.put('/:id/reject', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER, ROLES.PAYROLL_OFFICER), validate(rejectLeaveSchema), leaveController.rejectLeave);
+router.put('/:id/cancel', roleMiddleware(ROLES.ADMIN, ROLES.HR_OFFICER, ROLES.PAYROLL_OFFICER), leaveController.cancelLeave);
 
 module.exports = router;

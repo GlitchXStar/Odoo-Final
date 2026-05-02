@@ -25,6 +25,8 @@ export default function EmployeeDashboard() {
   const [balances, setBalances] = useState([]);
   const [payrollData, setPayrollData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkError, setCheckError] = useState('');
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const firstName = user.first_name || user.firstName || 'there';
@@ -38,14 +40,14 @@ export default function EmployeeDashboard() {
           leaveBalances.getAll(),
           payroll.getAll(),
         ]);
-        const attRaw = attRes?.data?.attendance ?? attRes?.data ?? attRes;
-        setAttendanceData(Array.isArray(attRaw) ? attRaw : []);
-        const leaveRaw = leaveRes?.data?.leaves ?? leaveRes?.data ?? leaveRes;
-        setLeaveHistory(Array.isArray(leaveRaw) ? leaveRaw : []);
-        const balRaw = balRes?.data ?? balRes;
-        setBalances(Array.isArray(balRaw) ? balRaw : []);
-        const payRaw = payRes?.data ?? payRes;
-        setPayrollData(Array.isArray(payRaw) ? payRaw : []);
+        // attendance → { data: { attendance: [], pagination: {} } }
+        setAttendanceData(Array.isArray(attRes?.data?.attendance) ? attRes.data.attendance : []);
+        // leaves → { data: { leaves: [], pagination: {} } }
+        setLeaveHistory(Array.isArray(leaveRes?.data?.leaves) ? leaveRes.data.leaves : []);
+        // leaveBalances → { data: [] } flat array
+        setBalances(Array.isArray(balRes?.data) ? balRes.data : []);
+        // payroll → { data: [] } flat array
+        setPayrollData(Array.isArray(payRes?.data) ? payRes.data : []);
       } catch (e) {
         console.error('Employee dashboard error:', e);
       } finally {
@@ -54,8 +56,44 @@ export default function EmployeeDashboard() {
     })();
   }, []);
 
-  // Build this week's attendance (Mon–Sun)
+  // Determine today's attendance record
   const today = new Date();
+  const todayIso = today.toISOString().split('T')[0];
+  const todayRecord = attendanceData.find(a => a.date?.startsWith(todayIso));
+  const isCheckedIn = !!todayRecord?.check_in && !todayRecord?.check_out;
+  const isCheckedOut = !!todayRecord?.check_out;
+
+  const handleCheckIn = async () => {
+    setCheckInLoading(true);
+    setCheckError('');
+    try {
+      const res = await attendance.checkIn();
+      setAttendanceData(prev => {
+        const exists = prev.findIndex(a => a.date?.startsWith(todayIso));
+        if (exists >= 0) { const n = [...prev]; n[exists] = res.data; return n; }
+        return [res.data, ...prev];
+      });
+    } catch (e) {
+      setCheckError(e.message || 'Check-in failed');
+    } finally { setCheckInLoading(false); }
+  };
+
+  const handleCheckOut = async () => {
+    setCheckInLoading(true);
+    setCheckError('');
+    try {
+      const res = await attendance.checkOut();
+      setAttendanceData(prev => {
+        const exists = prev.findIndex(a => a.date?.startsWith(todayIso));
+        if (exists >= 0) { const n = [...prev]; n[exists] = res.data; return n; }
+        return prev;
+      });
+    } catch (e) {
+      setCheckError(e.message || 'Check-out failed');
+    } finally { setCheckInLoading(false); }
+  };
+
+  // Build this week's attendance (Mon–Sun)
   const startOfWeek = new Date(today);
   startOfWeek.setDate(today.getDate() - today.getDay() + 1);
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -70,19 +108,26 @@ export default function EmployeeDashboard() {
     return {
       day: DAY_LABELS[d.getDay()],
       status: st,
-      time: rec?.check_in ? new Date(`1970-01-01T${rec.check_in}`).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—',
+      time: rec?.check_in ? new Date(rec.check_in).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '—',
     };
   });
 
-  const presentDays = attendanceData.filter(a => a.status === 'Present').length;
-  const totalLeaveBalance = balances.reduce((sum, b) => sum + (b.balance || 0), 0);
-  const totalLeaveAllocated = balances.reduce((sum, b) => sum + (b.allocated || b.total || 0), 0);
+  const currentMonth = today.getMonth() + 1;
+  const currentYear = today.getFullYear();
+  const thisMonthAtt = attendanceData.filter(a => {
+    const d = new Date(a.date);
+    return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+  });
+  const presentDays = thisMonthAtt.filter(a => a.status === 'Present').length;
+  const workingDays = thisMonthAtt.length;
+  const totalLeaveBalance = balances.reduce((sum, b) => sum + (Number(b.balance) || 0), 0);
+  const totalLeaveAllocated = balances.reduce((sum, b) => sum + (Number(b.total_allocated) || 0), 0);
   const latestPayroll = payrollData[0] || {};
 
   const myStats = [
-    { label: 'Present Days', value: presentDays, total: attendanceData.length || '—', icon: CalendarCheck },
+    { label: 'Present Days', value: presentDays, total: workingDays || '—', icon: CalendarCheck },
     { label: 'Leave Balance', value: totalLeaveBalance, total: totalLeaveAllocated || '—', icon: CalendarOff },
-    { label: 'This Month Salary', value: latestPayroll.net_salary ? `₹${Number(latestPayroll.net_salary).toLocaleString('en-IN')}` : '—', icon: DollarSign },
+    { label: 'This Month Salary', value: latestPayroll.net_salary ? `₹${Number(latestPayroll.net_salary).toLocaleString('en-IN')}` : '—', total: null, icon: DollarSign },
   ];
 
   if (loading) {
@@ -103,10 +148,32 @@ export default function EmployeeDashboard() {
             Here's a summary of your work status this month.
           </p>
         </div>
-        <button className="btn-primary inline-flex items-center gap-2">
-          <Clock size={16} />
-          Check In
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          {isCheckedOut ? (
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-success/10 text-success text-body-sm font-medium">
+              <Clock size={16} /> Checked out · {new Date(todayRecord.check_out).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+            </span>
+          ) : isCheckedIn ? (
+            <button
+              onClick={handleCheckOut}
+              disabled={checkInLoading}
+              className="btn-primary inline-flex items-center gap-2 bg-error hover:bg-red-600 disabled:opacity-60"
+            >
+              {checkInLoading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Clock size={16} />}
+              Check Out
+            </button>
+          ) : (
+            <button
+              onClick={handleCheckIn}
+              disabled={checkInLoading}
+              className="btn-primary inline-flex items-center gap-2 disabled:opacity-60"
+            >
+              {checkInLoading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Clock size={16} />}
+              Check In
+            </button>
+          )}
+          {checkError && <p className="text-caption text-error">{checkError}</p>}
+        </div>
       </div>
 
       {/* Quick Stats */}

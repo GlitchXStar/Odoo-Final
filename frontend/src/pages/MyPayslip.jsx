@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import {
   Download, Eye, ChevronLeft, ChevronRight, Calendar, DollarSign
 } from 'lucide-react';
-import { payroll, salaryStructures } from '../services/api.js';
+import { payroll } from '../services/api.js';
 
 export default function MyPayslip() {
   const [myPayslips, setMyPayslips] = useState([]);
   const [currentSalary, setCurrentSalary] = useState({
-    basic: 0, hra: 0, da: 0, conveyance: 0, medical: 0, special: 0,
-    gross: 0, pf: 0, tax: 0, pt: 0, totalDeductions: 0, net: 0,
+    basic: 0, hra: 0, allowances: 0, bonus: 0,
+    gross: 0, pf: 0, esi: 0, tax: 0, tds: 0, pt: 0, otherDeductions: 0, totalDeductions: 0, net: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -21,30 +21,27 @@ export default function MyPayslip() {
   const fetchMyPayslips = async () => {
     try {
       setLoading(true);
-      const [payrollRes, salaryRes] = await Promise.all([
-        payroll.getAll(),
-        salaryStructures.getAll()
-      ]);
-      setMyPayslips(payrollRes.data || []);
-      
-      // Get active salary structure
-      const activeSalary = salaryRes.data?.find(s => s.is_active) || {};
-      if (activeSalary) {
-        setCurrentSalary({
-          basic: activeSalary.basic || 0,
-          hra: activeSalary.hra || 0,
-          da: activeSalary.da || 0,
-          conveyance: activeSalary.conveyance || 0,
-          medical: activeSalary.medical || 0,
-          special: activeSalary.special || 0,
-          gross: activeSalary.gross || 0,
-          pf: activeSalary.pf || 0,
-          tax: activeSalary.tax || 0,
-          pt: activeSalary.professional_tax || 0,
-          totalDeductions: (activeSalary.pf || 0) + (activeSalary.tax || 0) + (activeSalary.professional_tax || 0),
-          net: activeSalary.net || 0,
-        });
-      }
+      const payrollRes = await payroll.getAll();
+      const list = Array.isArray(payrollRes?.data) ? payrollRes.data : [];
+      setMyPayslips(list);
+
+      // Derive salary breakdown from the most recent payroll record
+      const latest = list[0] || {};
+      setCurrentSalary({
+        basic:           Number(latest.basic)            || 0,
+        hra:             Number(latest.hra)              || 0,
+        allowances:      Number(latest.allowances)       || 0,
+        bonus:           Number(latest.bonus)            || 0,
+        gross:           Number(latest.gross_salary)     || 0,
+        pf:              Number(latest.pf_deduction)     || 0,
+        esi:             Number(latest.esi_deduction)    || 0,
+        tax:             Number(latest.income_tax)       || 0,
+        tds:             Number(latest.tds)              || 0,
+        pt:              Number(latest.professional_tax) || 0,
+        otherDeductions: Number(latest.other_deductions) || 0,
+        totalDeductions: Number(latest.total_deductions) || 0,
+        net:             Number(latest.net_salary)       || 0,
+      });
     } catch (err) {
       setError(err.message || 'Failed to load payslips');
     } finally {
@@ -109,6 +106,13 @@ export default function MyPayslip() {
       </div>
 
       {/* Salary Breakdown */}
+      {currentSalary.basic === 0 && currentSalary.hra === 0 && currentSalary.allowances === 0 ? (
+        <div className="bg-surface-card border border-hairline rounded-lg p-6 mb-8">
+          <p className="text-body-sm text-muted text-center">
+            Detailed salary breakdown not available. Your salary structure may not be configured yet. Contact your HR/Payroll team.
+          </p>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-canvas border border-hairline rounded-lg">
           <div className="px-5 py-4 border-b border-hairline">
@@ -118,19 +122,17 @@ export default function MyPayslip() {
             {[
               ['Basic Salary', currentSalary.basic],
               ['HRA', currentSalary.hra],
-              ['DA', currentSalary.da],
-              ['Conveyance', currentSalary.conveyance],
-              ['Medical', currentSalary.medical],
-              ['Special Allowance', currentSalary.special],
-            ].map(([label, val]) => (
+              ['Allowances', currentSalary.allowances],
+              ['Bonus', currentSalary.bonus],
+            ].filter(([, val]) => val > 0).map(([label, val]) => (
               <div key={label} className="flex justify-between text-body-sm">
                 <span className="text-muted">{label}</span>
-                <span className="text-ink font-medium">₹{val.toLocaleString()}</span>
+                <span className="text-ink font-medium">₹{val.toLocaleString('en-IN')}</span>
               </div>
             ))}
             <div className="flex justify-between text-body-sm font-medium text-ink border-t border-hairline pt-3">
               <span>Gross Salary</span>
-              <span>₹{currentSalary.gross.toLocaleString()}</span>
+              <span>₹{currentSalary.gross.toLocaleString('en-IN')}</span>
             </div>
           </div>
         </div>
@@ -140,10 +142,13 @@ export default function MyPayslip() {
           </div>
           <div className="p-5 space-y-3">
             {[
-              ['Provident Fund', currentSalary.pf],
+              ['Provident Fund (PF)', currentSalary.pf],
+              ['ESI', currentSalary.esi],
               ['Income Tax (TDS)', currentSalary.tax],
+              ['TDS', currentSalary.tds],
               ['Professional Tax', currentSalary.pt],
-            ].map(([label, val]) => (
+              ['Other Deductions', currentSalary.otherDeductions],
+            ].filter(([, val]) => val > 0).map(([label, val]) => (
               <div key={label} className="flex justify-between text-body-sm">
                 <span className="text-muted">{label}</span>
                 <span className="text-error font-medium">-₹{val.toLocaleString()}</span>
@@ -156,6 +161,7 @@ export default function MyPayslip() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Payslip History */}
       <div className="bg-canvas border border-hairline rounded-lg overflow-hidden">
@@ -170,32 +176,36 @@ export default function MyPayslip() {
                   <Calendar size={18} className="text-muted" />
                 </div>
                 <div>
-                  <p className="text-body-sm font-medium text-ink">{ps.month}</p>
+                  <p className="text-body-sm font-medium text-ink">
+                    {new Date(ps.year, ps.month - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                  </p>
                   <p className="text-caption text-muted">
-                    Paid on {new Date(ps.paidOn).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    Generated on {ps.created_at ? new Date(ps.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-6">
                 <div className="hidden sm:flex items-center gap-6 text-body-sm">
-                  <span className="text-muted">₹{ps.gross.toLocaleString()}</span>
-                  <span className="text-error">-₹{ps.deductions.toLocaleString()}</span>
-                  <span className="font-medium text-ink">₹{ps.net.toLocaleString()}</span>
+                  <span className="text-muted">₹{Number(ps.gross_salary).toLocaleString('en-IN')}</span>
+                  <span className="text-error">-₹{Number(ps.total_deductions).toLocaleString('en-IN')}</span>
+                  <span className="font-medium text-ink">₹{Number(ps.net_salary).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Link
-                    to={`/app/payroll/payslips/${ps.id}`}
+                    to={`/app/payslip/${ps.id}`}
                     className="p-1.5 text-muted hover:text-ink hover:bg-surface-card rounded-md transition-all"
                     title="View"
                   >
                     <Eye size={14} />
                   </Link>
-                  <button
+                  <a
+                    href={`/api/payslip/${ps.id}/download`}
+                    download
                     className="p-1.5 text-muted hover:text-ink hover:bg-surface-card rounded-md transition-all"
-                    title="Download"
+                    title="Download PDF"
                   >
                     <Download size={14} />
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>

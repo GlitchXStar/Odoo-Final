@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [otp, setOtp] = useState('');
   const [loginMode, setLoginMode] = useState('password');
   const [otpSent, setOtpSent] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -34,6 +35,7 @@ export default function LoginPage() {
   };
 
   const handleRequestOtp = async () => {
+    if (otpCooldown > 0) return;
     setIsLoading(true);
     setError('');
     setMessage('');
@@ -41,6 +43,13 @@ export default function LoginPage() {
       const response = await auth.requestOtp({ identifier });
       setOtpSent(true);
       setMessage(response.message || 'OTP sent to your registered email.');
+      setOtpCooldown(60);
+      const timer = setInterval(() => {
+        setOtpCooldown((c) => {
+          if (c <= 1) { clearInterval(timer); return 0; }
+          return c - 1;
+        });
+      }, 1000);
     } catch (err) {
       setError(err.message || 'Failed to send OTP');
     } finally {
@@ -208,10 +217,10 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={handleRequestOtp}
-                    disabled={isLoading || !identifier}
+                    disabled={isLoading || !identifier || otpCooldown > 0}
                     className="text-caption text-muted hover:text-ink transition-colors disabled:opacity-50"
                   >
-                    {otpSent ? 'Resend OTP' : 'Send OTP'}
+                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : otpSent ? 'Resend OTP' : 'Send OTP'}
                   </button>
                 </div>
                 <input

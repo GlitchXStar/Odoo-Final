@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import { leaves, leaveBalances } from '../services/api.js';
 
-const statusBadge = { pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected' };
-const statusLabel = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
+const statusBadge = { pending: 'badge-pending', approved: 'badge-approved', rejected: 'badge-rejected', cancelled: 'badge-rejected' };
+const statusLabel = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' };
 
 export default function MyLeaves() {
   const [myLeaves, setMyLeaves] = useState([]);
@@ -25,10 +25,11 @@ export default function MyLeaves() {
         leaves.getAll(),
         leaveBalances.getAll()
       ]);
-      const leavesRaw = leavesRes?.data?.leaves ?? leavesRes?.data ?? leavesRes;
-      setMyLeaves(Array.isArray(leavesRaw) ? leavesRaw : []);
-      const balRaw = balancesRes?.data ?? balancesRes;
-      setLeaveBalance(Array.isArray(balRaw) ? balRaw : []);
+      const leavesData = leavesRes?.data?.leaves ?? leavesRes?.data ?? [];
+      setMyLeaves(Array.isArray(leavesData) ? leavesData : []);
+      const balData = Array.isArray(balancesRes?.data) ? balancesRes.data : [];
+      const currentYear = new Date().getFullYear();
+      setLeaveBalance(balData.filter(b => !b.year || b.year === currentYear));
     } catch (err) {
       setError(err.message || 'Failed to load leave data');
     } finally {
@@ -72,26 +73,36 @@ export default function MyLeaves() {
 
       {/* Leave Balance */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {leaveBalance.map((bal) => (
-          <div key={bal.leave_type_name} className="bg-canvas border border-hairline rounded-lg p-5">
-            <p className="text-caption text-muted mb-3">{bal.leave_type_name}</p>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-title-lg text-ink">{bal.balance}</p>
-                <p className="text-caption text-muted">remaining</p>
-              </div>
-              <div className="text-right">
-                <p className="text-caption text-muted">{bal.used} used / {bal.allocated} total</p>
-                <div className="w-20 h-1.5 bg-surface-card rounded-full mt-1.5 overflow-hidden">
-                  <div
-                    className="h-full bg-ink rounded-full"
-                    style={{ width: `${bal.allocated > 0 ? (bal.used / bal.allocated) * 100 : 0}%` }}
-                  />
+        {leaveBalance.length === 0 ? (
+          <div className="col-span-full bg-surface-card border border-hairline rounded-lg p-6 text-center">
+            <p className="text-body-sm text-muted">No leave balance allocated. Contact your HR/Admin.</p>
+          </div>
+        ) : leaveBalance.map((bal) => {
+          const total = Number(bal.total_allocated) || 0;
+          const used = Number(bal.used) || 0;
+          const remaining = Number(bal.balance) || 0;
+          const usedPercent = total > 0 ? (used / total) * 100 : 0;
+          return (
+            <div key={bal.id} className="bg-canvas border border-hairline rounded-lg p-5">
+              <p className="text-caption text-muted mb-3">{bal.leave_type_name || 'Leave'}</p>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-title-lg text-ink">{remaining}</p>
+                  <p className="text-caption text-muted">remaining</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-caption text-muted">{used} used / {total} total</p>
+                  <div className="w-20 h-1.5 bg-surface-card rounded-full mt-1.5 overflow-hidden">
+                    <div
+                      className="h-full bg-primary rounded-full"
+                      style={{ width: `${Math.min(usedPercent, 100)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Leave History */}
@@ -100,28 +111,54 @@ export default function MyLeaves() {
           <h3 className="text-title-sm text-ink">Leave History</h3>
         </div>
         <div className="divide-y divide-hairline">
-          {myLeaves.map((leave) => (
-            <div key={leave.id} className="px-5 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-surface-card flex items-center justify-center">
-                  <CalendarOff size={18} className="text-muted" />
-                </div>
-                <div>
-                  <p className="text-body-sm font-medium text-ink">{leave.type}</p>
-                  <p className="text-caption text-muted">
-                    {new Date(leave.from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                    {leave.days > 1 && ` — ${new Date(leave.to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}
-                    {' · '}
-                    {leave.days} day{leave.days > 1 ? 's' : ''}
-                  </p>
-                  <p className="text-caption text-muted mt-0.5">{leave.reason}</p>
+          {myLeaves.length === 0 ? (
+            <div className="px-5 py-12 text-center">
+              <CalendarOff size={32} className="text-muted mx-auto mb-3" />
+              <p className="text-body-sm text-muted">No leave requests yet.</p>
+              <Link to="/app/time-off/apply" className="text-body-sm text-primary hover:underline mt-2 inline-block">
+                Apply for your first leave
+              </Link>
+            </div>
+          ) : myLeaves.map((leave) => {
+            const startDate = new Date(leave.start_date);
+            const endDate = new Date(leave.end_date);
+            const days = Number(leave.total_days) || 1;
+            const status = (leave.status || 'Pending').toLowerCase();
+            return (
+              <div key={leave.id} className="px-5 py-4 hover:bg-surface-soft/30 transition-colors">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="w-10 h-10 rounded-lg bg-surface-card flex items-center justify-center flex-shrink-0">
+                      <CalendarOff size={18} className="text-muted" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-body-sm font-medium text-ink">{leave.leave_type_name || 'Leave'}</p>
+                        <span className={`badge ${statusBadge[status] || 'badge-pending'}`}>
+                          {statusLabel[status] || leave.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-caption text-muted mb-1">
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar size={12} />
+                          {startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {days > 1 && ` → ${endDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </span>
+                        <span>·</span>
+                        <span>{days} day{days > 1 ? 's' : ''}</span>
+                      </div>
+                      {leave.reason && (
+                        <p className="text-caption text-muted line-clamp-2">{leave.reason}</p>
+                      )}
+                      <p className="text-caption text-muted/60 mt-1">
+                        Applied on {new Date(leave.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <span className={`badge ${statusBadge[leave.status]}`}>
-                {statusLabel[leave.status]}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

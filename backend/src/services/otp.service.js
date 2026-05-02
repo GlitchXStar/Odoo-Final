@@ -34,6 +34,23 @@ const requestOTP = async (identifier) => {
     throw new AppError('Account is deactivated. Contact admin.', 403);
   }
 
+  // Cooldown: if a valid OTP was created within the last 60s, don't send a new one
+  const recentOtp = await query(
+    `SELECT id FROM otp_verifications
+     WHERE user_id = $1 AND is_used = FALSE AND expires_at > NOW()
+       AND created_at > NOW() - INTERVAL '60 seconds'
+     ORDER BY created_at DESC LIMIT 1`,
+    [user.id]
+  );
+  if (recentOtp.rows.length > 0) {
+    const [localPart, domain] = user.email.split('@');
+    return {
+      message: 'OTP already sent. Please wait 60 seconds before requesting a new one.',
+      email: localPart.substring(0, 2) + '***@' + domain,
+      expiresInSeconds: OTP_EXPIRY_MINUTES * 60,
+    };
+  }
+
   // Invalidate all existing unused OTPs for this user
   await query(
     `UPDATE otp_verifications SET is_used = TRUE

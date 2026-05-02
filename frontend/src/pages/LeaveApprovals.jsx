@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
-  CheckCircle, XCircle, Clock, ArrowRight, ChevronDown, Search
+  CheckCircle, XCircle, Clock, ArrowRight, ChevronDown, Search, Ban
 } from 'lucide-react';
 import { leaves } from '../services/api.js';
 
+const STATUS_TABS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
+const statusBadge = { Pending: 'badge-pending', Approved: 'badge-approved', Rejected: 'badge-rejected', Cancelled: 'badge-rejected' };
+
 export default function LeaveApprovals() {
-  const [requests, setRequests] = useState([]);
+  const [allRequests, setAllRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [rejectionReasons, setRejectionReasons] = useState({});
+  const [activeTab, setActiveTab] = useState('Pending');
+  const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
     fetchLeaves();
@@ -20,8 +25,7 @@ export default function LeaveApprovals() {
       setLoading(true);
       const response = await leaves.getAll();
       const list = response?.data?.leaves ?? response?.data ?? response;
-      const all = Array.isArray(list) ? list : [];
-      setRequests(all.filter(l => l.status === 'Pending'));
+      setAllRequests(Array.isArray(list) ? list : []);
     } catch (err) {
       setError(err.message || 'Failed to load leave requests');
     } finally {
@@ -31,18 +35,26 @@ export default function LeaveApprovals() {
 
   const handleAction = async (id, action) => {
     try {
+      setActionLoading(id);
       if (action === 'approve') {
         await leaves.approve(id);
-      } else {
+      } else if (action === 'reject') {
         const reason = rejectionReasons[id]?.trim() || 'Rejected by manager';
         await leaves.reject(id, reason);
+      } else if (action === 'cancel') {
+        await leaves.cancel(id);
       }
-      setRequests((prev) => prev.filter((r) => r.id !== id));
       setRejectionReasons((prev) => { const n = { ...prev }; delete n[id]; return n; });
+      await fetchLeaves();
     } catch (err) {
       setError(err.message || `Failed to ${action} leave`);
+    } finally {
+      setActionLoading(null);
     }
   };
+
+  const requests = activeTab === 'All' ? allRequests : allRequests.filter(r => r.status === activeTab);
+  const pendingCount = allRequests.filter(r => r.status === 'Pending').length;
 
   if (loading) {
     return (
@@ -74,8 +86,30 @@ export default function LeaveApprovals() {
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-status-pending-bg rounded-pill text-caption font-medium text-status-pending-text">
           <Clock size={14} />
-          {requests.length} pending
+          {pendingCount} pending
         </div>
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-1 mb-6 border-b border-hairline">
+        {STATUS_TABS.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2.5 text-body-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted hover:text-ink'
+            }`}
+          >
+            {tab}
+            {tab !== 'All' && (
+              <span className="ml-1.5 text-caption text-muted">
+                ({allRequests.filter(r => r.status === tab).length})
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Requests List */}
@@ -165,21 +199,43 @@ export default function LeaveApprovals() {
                     />
                   </div>
                   <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleAction(req.id, 'approve')}
-                      className="btn-primary inline-flex items-center gap-2"
-                    >
-                      <CheckCircle size={16} />
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleAction(req.id, 'reject')}
-                      disabled={!rejectionReasons[req.id]?.trim()}
-                      className="btn-secondary inline-flex items-center gap-2 text-error border-error/30 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <XCircle size={16} />
-                      Reject
-                    </button>
+                    {req.status === 'Pending' && (
+                      <>
+                        <button
+                          onClick={() => handleAction(req.id, 'approve')}
+                          disabled={actionLoading === req.id}
+                          className="btn-primary inline-flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <CheckCircle size={16} />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleAction(req.id, 'reject')}
+                          disabled={!rejectionReasons[req.id]?.trim() || actionLoading === req.id}
+                          className="btn-secondary inline-flex items-center gap-2 text-error border-error/30 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <XCircle size={16} />
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    {(req.status === 'Pending' || req.status === 'Approved') && (
+                      <button
+                        onClick={() => {
+                          if (confirm(`Cancel ${req.first_name}'s ${req.leave_type_name} leave?`)) {
+                            handleAction(req.id, 'cancel');
+                          }
+                        }}
+                        disabled={actionLoading === req.id}
+                        className="btn-secondary inline-flex items-center gap-2 text-error border-error/30 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <Ban size={16} />
+                        Cancel Leave
+                      </button>
+                    )}
+                    {(req.status === 'Rejected' || req.status === 'Cancelled') && (
+                      <span className={`badge ${statusBadge[req.status]}`}>{req.status}</span>
+                    )}
                   </div>
                 </div>
               )}

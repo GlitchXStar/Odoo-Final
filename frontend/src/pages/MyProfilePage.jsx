@@ -44,14 +44,33 @@ export default function MyProfilePage() {
         payroll.getAll()
       ]);
       
-      setMyProfile(empRes.data || {});
+      const d = empRes.data || {};
+      // Normalise into a flat shape the UI expects
+      setMyProfile({
+        ...d,
+        name: [d.first_name, d.last_name].filter(Boolean).join(' ') || '—',
+        employee_id: d.employee_code || d.login_id || '—',
+        designation: d.designation || '—',
+        department: d.department || '—',
+        email: d.email || '—',
+        phone: d.phone || '—',
+        address: d.current_address || d.permanent_address || '—',
+        join_date: d.date_of_joining || null,
+        dob: d.date_of_birth || null,
+        gender: d.gender || '—',
+        blood_group: d.blood_group || '—',
+        employment_type: d.employment_type || '—',
+        status: d.status || 'Active',
+      });
       
       // Calculate stats
-      const leaveBalance = leavesRes.data?.reduce((sum, l) => sum + (l.days || 0), 0) || 0;
+      const leaveList = leavesRes?.data?.leaves || leavesRes?.leaves || [];
+      const pendingLeaves = leaveList.filter((l) => l.status === 'Pending').length;
+      const payrollList = Array.isArray(payrollRes?.data) ? payrollRes.data : [];
       setQuickStats([
         { label: 'Present Days', value: '22 / 25', icon: CalendarDays },
-        { label: 'Leave Balance', value: `${leaveBalance} days`, icon: CalendarOff },
-        { label: 'Payslips', value: (payrollRes.data?.length || 0).toString(), icon: FileText },
+        { label: 'Pending Leaves', value: `${pendingLeaves}`, icon: CalendarOff },
+        { label: 'Payslips', value: payrollList.length.toString(), icon: FileText },
       ]);
     } catch (err) {
       setError(err.message || 'Failed to load profile');
@@ -137,7 +156,6 @@ export default function MyProfilePage() {
           <div className="px-6 py-2 divide-y divide-hairline">
             <InfoRow icon={Mail} label="Email" value={myProfile.email} />
             <InfoRow icon={Phone} label="Phone" value={myProfile.phone} />
-            <InfoRow icon={MapPin} label="Location" value={myProfile.location} />
             <InfoRow icon={MapPin} label="Address" value={myProfile.address} />
           </div>
         </div>
@@ -150,8 +168,8 @@ export default function MyProfilePage() {
           <div className="px-6 py-2 divide-y divide-hairline">
             <InfoRow icon={Building2} label="Department" value={myProfile.department} />
             <InfoRow icon={Briefcase} label="Designation" value={myProfile.designation} />
-            <InfoRow icon={User} label="Reporting To" value={myProfile.reporting_to} />
-            <InfoRow icon={Clock} label="Joined" value={myProfile.join_date ? new Date(myProfile.join_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} />
+            <InfoRow icon={Briefcase} label="Employment Type" value={myProfile.employment_type} />
+            <InfoRow icon={Clock} label="Date of Joining" value={myProfile.join_date ? new Date(myProfile.join_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
           </div>
         </div>
 
@@ -162,11 +180,11 @@ export default function MyProfilePage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-hairline">
             <div className="px-6 py-2 divide-y divide-hairline">
-              <InfoRow icon={Calendar} label="Date of Birth" value={myProfile.dob ? new Date(myProfile.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} />
+              <InfoRow icon={Calendar} label="Date of Birth" value={myProfile.dob ? new Date(myProfile.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
               <InfoRow icon={User} label="Gender" value={myProfile.gender} />
             </div>
             <div className="px-6 py-2 divide-y divide-hairline">
-              <InfoRow icon={User} label="Marital Status" value={myProfile.marital_status} />
+              <InfoRow icon={Phone} label="Emergency Contact" value={myProfile.emergency_contact_name ? `${myProfile.emergency_contact_name}${myProfile.emergency_contact_phone ? ' · ' + myProfile.emergency_contact_phone : ''}` : '—'} />
               <InfoRow icon={User} label="Blood Group" value={myProfile.blood_group} />
             </div>
           </div>
