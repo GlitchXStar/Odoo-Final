@@ -24,7 +24,7 @@
 ## 🎥 Demo
 
 🔗 Live Demo: https://odoo.notcaliper.dev/
-
+🔗 Live Demo Video: https://drive.google.com/file/d/1HMN1c525Xe1zaPUwd_-fkBbafEc6BowK/view?usp=sharing
 ---
 
 ## 🔍 The Core Problems
