@@ -23,9 +23,13 @@
 
 ## 🎥 Demo
 
-🔗 Live Demo: https://odoo.notcaliper.dev/
-🔗 Live Demo Video: https://drive.google.com/file/d/1HMN1c525Xe1zaPUwd_-fkBbafEc6BowK/view?usp=sharing
+> **Experience the live platform and see the system in action.**
+
+- **🌐 Live Demo:** [odoo.notcaliper.dev](https://odoo.notcaliper.dev/)
+- **🎬 Demo Video:** [Watch on Google Drive](https://drive.google.com/file/d/1HMN1c525Xe1zaPUwd_-fkBbafEc6BowK/view?usp=sharing)
+
 ---
+
 
 ## 🔍 The Core Problems
 
